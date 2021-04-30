@@ -1,7 +1,6 @@
 package main
 
 /*
-#cgo LDFLAGS: -s -w
 #include "vips.h"
 */
 import "C"
