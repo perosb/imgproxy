@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [2.16.4] - 2021-06-16
+### Change
+- Use magenta (ff00ff) as a transparency key in `trim`.
+
+### Fix
+- Fix crashes while processing some SVGs (dockerized version).
+- (pro) Fix parsing HEIF/AVIF meta.
+
 ## [2.16.3] - 2021-04-05
 ### Fix
 - Fix PNG quantization palette size.
