@@ -1,29 +1,30 @@
 FROM archlinux:base-devel as base
 
-ARG VIPS_VERSION=8.10.6
+ARG VIPS_VERSION=8.11.0
 ARG VIPS_URL=https://github.com/libvips/libvips/releases/download
-
-RUN echo "Server = https://mirror.osbeck.com/archlinux/\$repo/os/\$arch" > /etc/pacman.d/mirrorlist && \
-	sed -i -e 's~#IgnorePkg.*~IgnorePkg = filesystem~g' '/etc/pacman.conf'
+RUN echo "Server = https://mirror.osbeck.com/archlinux/\$repo/os/\$arch" > /etc/pacman.d/mirrorlist
+# && \
+#	sed -i -e 's~#IgnorePkg.*~IgnorePkg = filesystem~g' '/etc/pacman.conf'
 
 RUN \
 	pacman -Sy --noconfirm \
-	#cfitsio \
-	#fftw \
-	#imagemagick \
+cfitsio \
+fftw \
+imagemagick \
 	lcms2 \
 	libexif \
-	#libgsf \
+ libgsf \
 	libimagequant \
 	libjpeg-turbo \
 	libpng \
 	librsvg \
 	libtiff \
 	libwebp \
-	#openexr \
+#openexr \
 	orc \
-	#pango \
-	#poppler-glib \
+pango \
+#poppler-glib \
+	gobject-introspection \
 	libde265 \
 	x265 \
 	cmake \
@@ -43,32 +44,34 @@ WORKDIR /tmp/
 # 	sed -i 's#572af4b99669f2aff52748446fe985373fdfabe9dedfcc484c8346937a6adb80c60e251126ca529c75f6ace24c6c9a9d71bbf7eede49f07a97fde57ee04494ad#ba518ff074cf7b237e39ebbbaf8371aa4bdc49e04deea3a65701277b0df13096ea2ca95ee7b26c53dac5338b03eeda33b38a039515c027d7d1edcb045ffd5738#' PKGBUILD && \
 # 	sudo -u nobody makepkg --noconfirm
 
-# FROM base as libheif
+FROM base as libheif
 # #COPY --from=aom /tmp/*.zst /tmp/
 # #RUN pacman -U /tmp/*.zst --noconfirm
-# RUN curl https://raw.githubusercontent.com/archlinux/svntogit-packages/packages/libheif/trunk/PKGBUILD -sLO
-# RUN \
-# 	sed -i 's#make$#make -j6#' PKGBUILD && \
-# 	sudo -u nobody makepkg --noconfirm
+
+COPY docker/PKGBUILD.patch PKGBUILD.patch
+RUN \
+	curl https://raw.githubusercontent.com/archlinux/svntogit-packages/packages/libheif/trunk/PKGBUILD -sLO && \
+	curl https://github.com/strukturag/libheif/commit/47a2326b0be36d2c0516ca8479a8d12c64eb9774.patch -sLO
+RUN \
+	sed -i 's#make$#make -j6#' PKGBUILD && \
+	patch -p0 < PKGBUILD.patch && \
+	sudo -u nobody makepkg --noconfirm 
 
 FROM base as libvips
-#COPY --from=libheif /tmp/*.zst /tmp/
-#RUN pacman -U /tmp/*.zst --noconfirm
-RUN curl -sLO https://raw.githubusercontent.com/archlinux/svntogit-community/packages/libvips/trunk/PKGBUILD && \
-	sed -i 's#8.10.3#8.10.6#' PKGBUILD && \
-	sed -i 's#\./configure#CFLAGS=\"-g -O3\" CXXFLAGS=\"-D_GLIBCXX_USE_CXX11_ABI=0 -g -O3\" ./configure --disable-debug --disable-dependency-tracking --disable-introspection --disable-static --enable-gtk-doc-html=no --enable-gtk-doc=no#' PKGBUILD && \
-	sed -i 's#make$#make -j4#' PKGBUILD && \
-	sed -i 's#'\''\(cfitsio\|fftw\|imagemagick\|libgsf\|openexr\|pango\|poppler-glib\)'\''##g' PKGBUILD && \
-	sed -i 's#depends=(#depends=('\''lcms2'\'' #g' PKGBUILD && \
-	sed -i \
-	's#f337717e30dcd5bf8efe089ab5579af0938e0172c9aa87ab03120ea838378e3cf5ca6477d4f32f5eeeed56fe8e6e0ab8091c7bb5fe2be07a8bfa545aa15271c7#e3e623ad7b44dfb65078c49d2694d94bb11294300630d9e3c53ff1f9e9aaf58d196881d52c191b4604d9f63453199b7da3601425ffc9554f1c25cf08d630ef8b#' \
-	PKGBUILD
-RUN sudo -u nobody makepkg --noconfirm
+COPY --from=libheif /tmp/*.zst /tmp/
+RUN pacman -U /tmp/*.zst --noconfirm
+RUN \
+	curl -sLO https://raw.githubusercontent.com/archlinux/svntogit-community/packages/libvips/trunk/PKGBUILD && \
+	sed -i 's#\./configure#CFLAGS=\"-g -O3\" CXXFLAGS=\"-D_GLIBCXX_USE_CXX11_ABI=0 -g -O3\" ./configure --disable-debug --disable-dependency-tracking --disable-introspection --disable-static --disable-modules --enable-gtk-doc-html=no --enable-gtk-doc=no#' PKGBUILD && \
+	sed -i "s#'openexr'##" PKGBUILD && \
+        sed -i "s#'poppler-glib'##" PKGBUILD && \
+        sudo -u nobody makepkg --noconfirm
 
 FROM base as imgproxy
 COPY --from=libvips /tmp/*.zst /tmp/
-RUN pacman -Sy --noconfirm go && \
- 	pacman -U /tmp/*.zst --noconfirm
+RUN \
+	pacman -Sy --noconfirm go && \
+	pacman -U /tmp/*.zst --noconfirm
 
 WORKDIR ${GOPATH}/src/github.com/imgproxy/imgproxy
 COPY . .
@@ -88,8 +91,9 @@ COPY --from=imgproxy /tmp/*.zst /tmp/
 COPY --from=imgproxy /usr/local/bin/imgproxy /usr/local/bin/imgproxy
 
 RUN	\
+	ls -al /tmp/*.zst && \
 	pacman -Sy --noconfirm && \
-	#pacman -S --noconfirm libvips && \
+#	pacman -S --noconfirm libvips && \
 	pacman -U /tmp/*.zst --noconfirm && \
 	yes | pacman -Scc && \
 	rm -rf  /tmp/*.zst /var/lib/pacman/sync/*.db /usr/include/
