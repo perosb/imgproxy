@@ -127,6 +127,7 @@ func (it imageType) SupportsAlpha() bool {
 
 func (it imageType) SupportsColourProfile() bool {
 	return it == imageTypeJPEG ||
+		it == imageTypePNG ||
 		it == imageTypeWEBP ||
 		it == imageTypeAVIF
 }
