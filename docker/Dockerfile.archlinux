@@ -1,8 +1,7 @@
 FROM archlinux:base-devel as base
 
-ARG VIPS_VERSION=8.11.0
-ARG VIPS_URL=https://github.com/libvips/libvips/releases/download
 RUN echo "Server = https://mirror.osbeck.com/archlinux/\$repo/os/\$arch" > /etc/pacman.d/mirrorlist
+RUN echo "ParallelDownloads = 5" >> /etc/pacman.conf
 # && \
 #	sed -i -e 's~#IgnorePkg.*~IgnorePkg = filesystem~g' '/etc/pacman.conf'
 
@@ -32,8 +31,7 @@ pango \
 	doxygen \
 	git \
 	yasm \
-	aom \
-	libheif
+	aom
 
 WORKDIR /tmp/
 

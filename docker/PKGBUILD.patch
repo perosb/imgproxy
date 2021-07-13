@@ -1,0 +1,10 @@
+--- PKGBUILD	2021-05-09 11:14:11.701788984 +0200
++++ PKGBUILD.mine	2021-05-09 11:04:57.767713608 +0200
+@@ -16,6 +16,7 @@ sha256sums=('e1ac2abb354fdc8ccdca71363eb
+ 
+ build() {
+   cd $pkgname-$pkgver
++  patch libheif/heif_encoder_aom.cc ../../47a2326b0be36d2c0516ca8479a8d12c64eb9774.patch
+   ./configure --prefix=/usr --enable-static=no
+   make
+ }

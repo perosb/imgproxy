@@ -13,3 +13,4 @@ CHANGELOG.md
 
 Dockerfile
 .dockerignore
+!docker/PKGBUILD*
