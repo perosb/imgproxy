@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [2.16.7] - 2021-07-20
+### Change
+- Reset DPI while stripping meta.
+
 ## [2.16.6] - 2021-07-08
 ### Fix
 - Fix performance regression in ICC profile handling.
