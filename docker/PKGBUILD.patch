@@ -4,7 +4,7 @@
  
  build() {
    cd $pkgname-$pkgver
-+  patch libheif/heif_encoder_aom.cc ../../47a2326b0be36d2c0516ca8479a8d12c64eb9774.patch
++  patch libheif/heif_encoder_aom.cc ../../de0c159a60c2c50931321f06e36a3b6640c5c807.patch
    ./configure --prefix=/usr --enable-static=no
    make
  }

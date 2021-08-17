@@ -49,7 +49,7 @@ FROM base as libheif
 COPY docker/PKGBUILD.patch PKGBUILD.patch
 RUN \
 	curl https://raw.githubusercontent.com/archlinux/svntogit-packages/packages/libheif/trunk/PKGBUILD -sLO && \
-	curl https://github.com/strukturag/libheif/commit/47a2326b0be36d2c0516ca8479a8d12c64eb9774.patch -sLO
+	curl https://github.com/strukturag/libheif/commit/de0c159a60c2c50931321f06e36a3b6640c5c807.patch -sLO
 RUN \
 	sed -i 's#make$#make -j6#' PKGBUILD && \
 	patch -p0 < PKGBUILD.patch && \
