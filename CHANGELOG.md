@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [2.17.0] - 2021-09-07
+### Added
+- Wildcard support in `IMGPROXY_ALLOWED_SOURCES`.
+
+### Change
+- If the source URL contains the `IMGPROXY_BASE_URL` prefix, it won't be added.
+
+### Fix
+- (pro) Fix path prefix support in the `/info` handler.
+
+### Deprecated
+- The [basic URL format](https://docs.imgproxy.net/generating_the_url_basic) is deprecated and can be removed in future versions. Use [advanced URL format](https://docs.imgproxy.net/generating_the_url_advanced) instead.
+
 ## [2.16.7] - 2021-07-20
 ### Change
 - Reset DPI while stripping meta.
