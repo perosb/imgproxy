@@ -414,7 +414,7 @@ Puts watermark on the processed image.
   * `soea`: south-east (bottom-right corner);
   * `sowe`: south-west (bottom-left corner);
   * `re`: replicate watermark to fill the whole image;
-* `x_offset`, `y_offset` - (optional) specify watermark offset by X and Y axes. Not applicable to `re` position;
+* `x_offset`, `y_offset` - (optional) specify watermark offset by X and Y axes. For `re` position, define spacing between tiles;
 * `scale` - (optional) floating point number that defines watermark size relative to the resulting image size. When set to `0` or omitted, watermark size won't be changed.
 
 Default: disabled
@@ -427,6 +427,21 @@ wmu:%url
 ```
 
 When set, imgproxy will use the image from the specified URL as a watermark. `url` is Base64-encoded URL of the custom watermark.
+
+Default: blank
+
+### Watermark text<i class='badge badge-pro'></i> :id=watermark-text
+
+```
+watermark_text:%text
+wmt:%text
+```
+
+When set, imgproxy will generate image from the provided text and use it as a watermark. `text` is Base64-encoded text of the custom watermark.
+
+By default, text color is black and font is `sans 16`. You can use [Pango markup](https://docs.gtk.org/Pango/pango_markup.html) in the `text` value to change the style.
+
+If you want to use your custom font, you need to put it to `/usr/share/fonts` inside a contsainer.
 
 Default: blank
 

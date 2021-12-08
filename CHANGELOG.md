@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+## [3.1.0] - 2021-12-08
+### Added
+- Add `IMGPROXY_ETAG_BUSTER` config.
+- (pro) [watermark_text](https://docs.imgproxy.net/generating_the_url?id=watermark-text) processing option.
+
+### Change
+- Improved ICC profiles handling.
+- Proper error message when the deprecated basic URL format is used.
+- Watermark offsets can be applied to replicated watermarks.
+
+### Fix
+- (pro) Fix parsing metadata of extended sequential JPEGs.
+
 ## [3.0.0] - 2021-11-23
 ### Added
 - (pro) [Autoquality](https://docs.imgproxy.net/autoquality).
