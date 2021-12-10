@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [3.1.1] - 2021-12-10
+### Fix
+- Fix crashes in some scenarios.
+
 ## [3.1.0] - 2021-12-08
 ### Added
 - Add `IMGPROXY_ETAG_BUSTER` config.
