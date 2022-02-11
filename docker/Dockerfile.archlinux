@@ -19,6 +19,7 @@ imagemagick \
 	librsvg \
 	libtiff \
 	libwebp \
+libcgif \
 #openexr \
 	orc \
 pango \
