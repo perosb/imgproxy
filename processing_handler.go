@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"net/http"
 	"net/http/cookiejar"
@@ -138,12 +137,7 @@ func respondWithNotModified(reqID string, r *http.Request, rw http.ResponseWrite
 }
 
 func handleProcessing(reqID string, rw http.ResponseWriter, r *http.Request) {
-	ctx, timeoutCancel := context.WithTimeout(r.Context(), time.Duration(config.WriteTimeout)*time.Second)
-	defer timeoutCancel()
-
-	var metricsCancel context.CancelFunc
-	ctx, metricsCancel, rw = metrics.StartRequest(ctx, rw, r)
-	defer metricsCancel()
+	ctx := r.Context()
 
 	path := r.RequestURI
 	if queryStart := strings.IndexByte(path, '?'); queryStart >= 0 {

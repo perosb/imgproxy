@@ -1,10 +1,12 @@
-ARG BASE_IMAGE_VERSION="v3.0.1"
+ARG BASE_IMAGE_VERSION="v3.2.1"
 
 FROM darthsim/imgproxy-base:${BASE_IMAGE_VERSION}
-LABEL maintainer="Sergey Alexandrovich <darthsim@gmail.com>"
+
+ARG BUILDPLATFORM
+ARG TARGETPLATFORM
 
 COPY . .
-RUN go build -v -o /usr/local/bin/imgproxy
+RUN docker/go.sh build -v -o /usr/local/bin/imgproxy
 
 # ==================================================================================================
 # Final image

@@ -2,6 +2,28 @@
 
 ## [Unreleased]
 
+## [3.2.2] - 2022-02-08
+### Fix
+- Fix the `IMGPROXY_AVIF_SPEED` config.
+
+## [3.2.1] - 2022-01-19
+### Fix
+- Fix support of BMP with unusual data offsets.
+
+## [3.2.0] - 2022-01-18
+### Added
+- (pro) Add `video_meta` to the `/info` response.
+- Add [zoom](https://docs.imgproxy.net/generating_the_url?id=zoom) processing option.
+- Add 1/2/4-bit BMP support.
+
+### Change
+- Optimized `crop`.
+
+### Fix
+- Fix Datadog support.
+- Fix `force` resizing + rotation.
+- (pro) Fix `obj` gravity.
+
 ## [3.1.3] - 2021-12-17
 ### Fix
 - Fix ETag checking when S3 is used.

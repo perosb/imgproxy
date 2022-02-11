@@ -23,11 +23,6 @@ const maxClientHintDPR = 8
 
 var errExpiredURL = errors.New("Expired URL")
 
-type GravityOptions struct {
-	Type GravityType
-	X, Y float64
-}
-
 type ExtendOptions struct {
 	Enabled bool
 	Gravity GravityOptions
@@ -70,6 +65,8 @@ type ProcessingOptions struct {
 	Height            int
 	MinWidth          int
 	MinHeight         int
+	ZoomWidth         float64
+	ZoomHeight        float64
 	Dpr               float64
 	Gravity           GravityOptions
 	Enlarge           bool
@@ -120,6 +117,8 @@ func NewProcessingOptions() *ProcessingOptions {
 			ResizingType:      ResizeFit,
 			Width:             0,
 			Height:            0,
+			ZoomWidth:         1,
+			ZoomHeight:        1,
 			Gravity:           GravityOptions{Type: GravityCenter},
 			Enlarge:           false,
 			Extend:            ExtendOptions{Enabled: false, Gravity: GravityOptions{Type: GravityCenter}},
@@ -211,11 +210,7 @@ func parseBoolOption(str string) bool {
 }
 
 func isGravityOffcetValid(gravity GravityType, offset float64) bool {
-	if gravity == GravityCenter {
-		return true
-	}
-
-	return offset >= 0 && (gravity != GravityFocusPoint || offset <= 1)
+	return gravity != GravityFocusPoint || (offset >= 0 && offset <= 1)
 }
 
 func parseGravity(g *GravityOptions, args []string) error {
@@ -378,6 +373,31 @@ func applyResizeOption(po *ProcessingOptions, args []string) error {
 	if len(args) > 1 {
 		if err := applySizeOption(po, args[1:]); err != nil {
 			return err
+		}
+	}
+
+	return nil
+}
+
+func applyZoomOption(po *ProcessingOptions, args []string) error {
+	nArgs := len(args)
+
+	if nArgs > 2 {
+		return fmt.Errorf("Invalid zoom arguments: %v", args)
+	}
+
+	if z, err := strconv.ParseFloat(args[0], 64); err == nil && z > 0 {
+		po.ZoomWidth = z
+		po.ZoomHeight = z
+	} else {
+		return fmt.Errorf("Invalid zoom value: %s", args[0])
+	}
+
+	if nArgs > 1 {
+		if z, err := strconv.ParseFloat(args[1], 64); err == nil && z > 0 {
+			po.ZoomHeight = z
+		} else {
+			return fmt.Errorf("Invalid zoom value: %s", args[0])
 		}
 	}
 
@@ -831,6 +851,8 @@ func applyURLOption(po *ProcessingOptions, name string, args []string) error {
 		return applyMinWidthOption(po, args)
 	case "min-height", "mh":
 		return applyMinHeightOption(po, args)
+	case "zoom", "z":
+		return applyZoomOption(po, args)
 	case "dpr":
 		return applyDprOption(po, args)
 	case "enlarge", "el":

@@ -62,7 +62,7 @@ func prepareBmpCanvas(width, height, bands int) (*C.VipsImage, []byte, error) {
 
 // decodeBmpPaletted reads an 8 bit-per-pixel BMP image from r.
 // If topDown is false, the image rows will be read bottom-up.
-func (img *Image) decodeBmpPaletted(r io.Reader, width, height int, palette []Color, topDown bool) error {
+func (img *Image) decodeBmpPaletted(r io.Reader, width, height, bpp int, palette []Color, topDown bool) error {
 	tmp, imgData, err := prepareBmpCanvas(width, height, 3)
 	if err != nil {
 		return err
@@ -76,7 +76,8 @@ func (img *Image) decodeBmpPaletted(r io.Reader, width, height int, palette []Co
 	}()
 
 	// Each row is 4-byte aligned.
-	b := make([]byte, (width+3)&^3)
+	cap := 8 / bpp
+	b := make([]byte, ((width+cap-1)/cap+3)&^3)
 
 	y0, y1, yDelta := height-1, -1, -1
 	if topDown {
@@ -93,8 +94,18 @@ func (img *Image) decodeBmpPaletted(r io.Reader, width, height int, palette []Co
 
 		p := imgData[y*stride : (y+1)*stride]
 
-		for i, j := 0, 0; i < len(p); i, j = i+3, j+1 {
-			c := palette[b[j]]
+		j, bit := 0, 8-bpp
+		for i := 0; i < len(p); i += 3 {
+			pind := (b[j] >> bit) & (1<<bpp - 1)
+
+			if bit == 0 {
+				bit = 8 - bpp
+				j++
+			} else {
+				bit -= bpp
+			}
+
+			c := palette[pind]
 
 			p[i+0] = c.R
 			p[i+1] = c.G
@@ -245,12 +256,8 @@ func (img *Image) loadBmp(data []byte) error {
 	}
 
 	switch bpp {
-	case 8:
+	case 1, 2, 4, 8:
 		palColors := readUint32(b[46:50])
-
-		if offset != fileHeaderLen+infoLen+palColors*4 {
-			return errBmpUnsupported
-		}
 
 		_, err := io.ReadFull(r, b[:palColors*4])
 		if err != nil {
@@ -264,21 +271,25 @@ func (img *Image) loadBmp(data []byte) error {
 			palette[i] = Color{b[4*i+2], b[4*i+1], b[4*i+0]}
 		}
 
-		return img.decodeBmpPaletted(r, width, height, palette, topDown)
+		if _, err := r.Seek(int64(offset), io.SeekStart); err != nil {
+			return err
+		}
+
+		return img.decodeBmpPaletted(r, width, height, int(bpp), palette, topDown)
 	case 24:
-		if offset != fileHeaderLen+infoLen {
-			return errBmpUnsupported
+		if _, err := r.Seek(int64(offset), io.SeekStart); err != nil {
+			return err
 		}
 		return img.decodeBmpRGB(r, width, height, 3, topDown, true)
 	case 32:
-		if offset != fileHeaderLen+infoLen {
-			return errBmpUnsupported
-		}
-
 		noAlpha := true
 		if infoLen >= 70 {
 			// Alpha mask is empty, so no alpha here
 			noAlpha = readUint32(b[66:70]) == 0
+		}
+
+		if _, err := r.Seek(int64(offset), io.SeekStart); err != nil {
+			return err
 		}
 
 		return img.decodeBmpRGB(r, width, height, 4, topDown, noAlpha)

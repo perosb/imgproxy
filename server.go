@@ -13,6 +13,7 @@ import (
 	"github.com/imgproxy/imgproxy/v3/config"
 	"github.com/imgproxy/imgproxy/v3/errorreport"
 	"github.com/imgproxy/imgproxy/v3/ierrors"
+	"github.com/imgproxy/imgproxy/v3/metrics"
 	"github.com/imgproxy/imgproxy/v3/reuseport"
 	"github.com/imgproxy/imgproxy/v3/router"
 )
@@ -26,12 +27,10 @@ var (
 func buildRouter() *router.Router {
 	r := router.New(config.PathPrefix)
 
-	r.PanicHandler = handlePanic
-
 	r.GET("/", handleLanding, true)
 	r.GET("/health", handleHealth, true)
 	r.GET("/favicon.ico", handleFavicon, true)
-	r.GET("/", withCORS(withSecret(handleProcessing)), false)
+	r.GET("/", withMetrics(withPanicHandler(withCORS(withSecret(handleProcessing)))), false)
 	r.HEAD("/", withCORS(handleHead), false)
 	r.OPTIONS("/", withCORS(handleHead), false)
 
@@ -77,6 +76,19 @@ func shutdownServer(s *http.Server) {
 	s.Shutdown(ctx)
 }
 
+func withMetrics(h router.RouteHandler) router.RouteHandler {
+	if !metrics.Enabled() {
+		return h
+	}
+
+	return func(reqID string, rw http.ResponseWriter, r *http.Request) {
+		ctx, metricsCancel, rw := metrics.StartRequest(r.Context(), rw, r)
+		defer metricsCancel()
+
+		h(reqID, rw, r.WithContext(ctx))
+	}
+}
+
 func withCORS(h router.RouteHandler) router.RouteHandler {
 	return func(reqID string, rw http.ResponseWriter, r *http.Request) {
 		if len(config.AllowOrigin) > 0 {
@@ -104,21 +116,34 @@ func withSecret(h router.RouteHandler) router.RouteHandler {
 	}
 }
 
-func handlePanic(reqID string, rw http.ResponseWriter, r *http.Request, err error) {
-	ierr := ierrors.Wrap(err, 3)
+func withPanicHandler(h router.RouteHandler) router.RouteHandler {
+	return func(reqID string, rw http.ResponseWriter, r *http.Request) {
+		defer func() {
+			if rerr := recover(); rerr != nil {
+				err, ok := rerr.(error)
+				if !ok {
+					panic(rerr)
+				}
 
-	if ierr.Unexpected {
-		errorreport.Report(err, r)
-	}
+				ierr := ierrors.Wrap(err, 3)
 
-	router.LogResponse(reqID, r, ierr.StatusCode, ierr)
+				if ierr.Unexpected {
+					errorreport.Report(err, r)
+				}
 
-	rw.WriteHeader(ierr.StatusCode)
+				router.LogResponse(reqID, r, ierr.StatusCode, ierr)
 
-	if config.DevelopmentErrorsMode {
-		rw.Write([]byte(ierr.Message))
-	} else {
-		rw.Write([]byte(ierr.PublicMessage))
+				rw.WriteHeader(ierr.StatusCode)
+
+				if config.DevelopmentErrorsMode {
+					rw.Write([]byte(ierr.Message))
+				} else {
+					rw.Write([]byte(ierr.PublicMessage))
+				}
+			}
+		}()
+
+		h(reqID, rw, r)
 	}
 }
 

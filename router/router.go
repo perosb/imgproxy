@@ -19,7 +19,6 @@ var (
 )
 
 type RouteHandler func(string, http.ResponseWriter, *http.Request)
-type PanicHandler func(string, http.ResponseWriter, *http.Request, error)
 
 type route struct {
 	Method  string
@@ -29,9 +28,8 @@ type route struct {
 }
 
 type Router struct {
-	prefix       string
-	Routes       []*route
-	PanicHandler PanicHandler
+	prefix string
+	Routes []*route
 }
 
 func (r *route) isMatch(req *http.Request) bool {
@@ -73,7 +71,8 @@ func (r *Router) HEAD(prefix string, handler RouteHandler, exact bool) {
 }
 
 func (r *Router) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
-	req = setRequestTime(req)
+	req, timeoutCancel := startRequestTimer(req)
+	defer timeoutCancel()
 
 	reqID := req.Header.Get(xRequestIDHeader)
 
@@ -94,16 +93,6 @@ func (r *Router) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	} else if ip := req.Header.Get("X-Real-IP"); len(ip) != 0 {
 		replaceRemoteAddr(req, ip)
 	}
-
-	defer func() {
-		if rerr := recover(); rerr != nil {
-			if err, ok := rerr.(error); ok && r.PanicHandler != nil {
-				r.PanicHandler(reqID, rw, req, err)
-			} else {
-				panic(rerr)
-			}
-		}
-	}()
 
 	LogRequest(reqID, req)
 
