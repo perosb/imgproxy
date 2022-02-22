@@ -37,6 +37,7 @@ var (
 	MaxSrcFileSize     int
 	MaxAnimationFrames int
 	MaxSvgCheckBytes   int
+	MaxRedirects       int
 
 	JpegProgressive       bool
 	PngInterlaced         bool
@@ -136,6 +137,8 @@ var (
 	FreeMemoryInterval             int
 	DownloadBufferSize             int
 	BufferPoolCalibrationThreshold int
+
+	HealthCheckPath string
 )
 
 var (
@@ -174,6 +177,7 @@ func Reset() {
 	MaxSrcFileSize = 0
 	MaxAnimationFrames = 1
 	MaxSvgCheckBytes = 32 * 1024
+	MaxRedirects = 10
 
 	JpegProgressive = false
 	PngInterlaced = false
@@ -273,6 +277,8 @@ func Reset() {
 	FreeMemoryInterval = 10
 	DownloadBufferSize = 0
 	BufferPoolCalibrationThreshold = 1024
+
+	HealthCheckPath = ""
 }
 
 func Configure() error {
@@ -303,6 +309,8 @@ func Configure() error {
 
 	configurators.Int(&MaxAnimationFrames, "IMGPROXY_MAX_ANIMATION_FRAMES")
 
+	configurators.Int(&MaxRedirects, "IMGPROXY_MAX_REDIRECTS")
+
 	configurators.Patterns(&AllowedSources, "IMGPROXY_ALLOWED_SOURCES")
 
 	configurators.Bool(&JpegProgressive, "IMGPROXY_JPEG_PROGRESSIVE")
@@ -323,6 +331,8 @@ func Configure() error {
 	configurators.Bool(&EnableAvifDetection, "IMGPROXY_ENABLE_AVIF_DETECTION")
 	configurators.Bool(&EnforceAvif, "IMGPROXY_ENFORCE_AVIF")
 	configurators.Bool(&EnableClientHints, "IMGPROXY_ENABLE_CLIENT_HINTS")
+
+	configurators.String(&HealthCheckPath, "IMGPROXY_HEALTH_CHECK_PATH")
 
 	if err := configurators.ImageTypes(&SkipProcessingFormats, "IMGPROXY_SKIP_PROCESSING_FORMATS"); err != nil {
 		return err

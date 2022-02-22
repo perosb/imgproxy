@@ -50,6 +50,8 @@
       document.getElementsByTagName("head")[0].appendChild(clink)
     }
 
+    var documentTitleBase = document.title;
+
     window.$docsify = {
       logo: '/assets/logo.svg',
       name: 'imgproxy',
@@ -71,6 +73,12 @@
             if (clink) {
               clink.href = "https://docs.imgproxy.net" + vm.route.path
             }
+          });
+        },
+        function (hook, vm) {
+          hook.doneEach((content) => {
+            if (document.title != documentTitleBase)
+              document.title += " | " + documentTitleBase;
           });
         }
       ]

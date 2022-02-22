@@ -49,6 +49,7 @@ echo $(xxd -g 2 -l 64 -p /dev/random | tr -d '\n')
   * `X-Origin-Content-Length`: the size of the source image
   * `X-Origin-Width`: the width of the source image
   * `X-Origin-Height`: the height of the source image
+* `IMGPROXY_SERVER_NAME`: <i class='badge badge-pro'></i> the `Server` header value. Default: `imgproxy`
 
 ## Security
 
@@ -66,6 +67,10 @@ imgproxy can process animated images (GIF, WebP), but since this operation is pr
 To check if the source image is SVG, imgproxy reads some amount of bytes; by default it reads a maximum of 32KB. However, you can change this value using the following variable:
 
 * `IMGPROXY_MAX_SVG_CHECK_BYTES`: the maximum number of bytes imgproxy will read to recognize SVG files. If imgproxy is unable to recognize your SVG, try increasing this number. Default: `32768` (32KB)
+
+Requests to some image sources may go through too many redirects or enter an infinite loop. You can limit the number of allowed redirects:
+
+* `IMGPROXY_MAX_REDIRECTS`: the max number of redirects imgproxy can follow while requesting the source image
 
 You can also specify a secret key to enable authorization with the HTTP `Authorization` header for use in production environments:
 
@@ -149,17 +154,17 @@ imgproxy can calculate the quality of the resulting image based on selected metr
 
 **⚠️Warning:** Autoquality requires the image to be saved several times. Use it only when you prefer the resulting size and quality over the speed.
 
-* `IMGPROXY_AUTOQUALITY_METHOD`: <i class='badge badge-pro'></i> <i class='badge badge-v3'></i> the method of quality calculation. Default: `none`
-* `IMGPROXY_AUTOQUALITY_TARGET`: <i class='badge badge-pro'></i> <i class='badge badge-v3'></i> desired value of the autoquality method metric. Default: 0.02
-* `IMGPROXY_AUTOQUALITY_MIN`: <i class='badge badge-pro'></i> <i class='badge badge-v3'></i> minimal quality imgproxy can use. Default: 70
-* `IMGPROXY_AUTOQUALITY_FORMAT_MIN`: <i class='badge badge-pro'></i> <i class='badge badge-v3'></i> the minimal quality imgproxy can use per format, comma divided. Example: `jpeg=70,avif=40,webp=60`. When value for the resulting format is not set, `IMGPROXY_AUTOQUALITY_MIN` value is used. Default: `avif=40`
-* `IMGPROXY_AUTOQUALITY_MAX`: <i class='badge badge-pro'></i> <i class='badge badge-v3'></i> the maximum quality imgproxy can use. Default: 80
-* `IMGPROXY_AUTOQUALITY_FORMAT_MAX`: <i class='badge badge-pro'></i> <i class='badge badge-v3'></i> the maximum quality imgproxy can use per format, comma divided. Example: `jpeg=70,avif=40,webp=60`. When a value for the resulting format is not set, the `IMGPROXY_AUTOQUALITY_MAX` value is used. Default: `avif=50`
-* `IMGPROXY_AUTOQUALITY_ALLOWED_ERROR`: <i class='badge badge-pro'></i> <i class='badge badge-v3'></i> the allowed `IMGPROXY_AUTOQUALITY_TARGET` error. Applicable only to `dssim` and `ml` methods. Default: 0.001
-* `IMGPROXY_AUTOQUALITY_MAX_RESOLUTION`: <i class='badge badge-pro'></i> <i class='badge badge-v3'></i> when this value is greater then zero and the resultant resolution exceeds the value, autoquality won't be used. Default: 0
-* `IMGPROXY_AUTOQUALITY_JPEG_NET`: <i class='badge badge-pro'></i> <i class='badge badge-v3'></i> the path to the neural network for JPEG.
-* `IMGPROXY_AUTOQUALITY_WEBP_NET`: <i class='badge badge-pro'></i> <i class='badge badge-v3'></i> the path to the neural network for WebP.
-* `IMGPROXY_AUTOQUALITY_AVIF_NET`: <i class='badge badge-pro'></i> <i class='badge badge-v3'></i> the path to the neural network for AVIF.
+* `IMGPROXY_AUTOQUALITY_METHOD`: <i class='badge badge-pro'></i> the method of quality calculation. Default: `none`
+* `IMGPROXY_AUTOQUALITY_TARGET`: <i class='badge badge-pro'></i> desired value of the autoquality method metric. Default: 0.02
+* `IMGPROXY_AUTOQUALITY_MIN`: <i class='badge badge-pro'></i> minimal quality imgproxy can use. Default: 70
+* `IMGPROXY_AUTOQUALITY_FORMAT_MIN`: <i class='badge badge-pro'></i> the minimal quality imgproxy can use per format, comma divided. Example: `jpeg=70,avif=40,webp=60`. When value for the resulting format is not set, `IMGPROXY_AUTOQUALITY_MIN` value is used. Default: `avif=40`
+* `IMGPROXY_AUTOQUALITY_MAX`: <i class='badge badge-pro'></i> the maximum quality imgproxy can use. Default: 80
+* `IMGPROXY_AUTOQUALITY_FORMAT_MAX`: <i class='badge badge-pro'></i> the maximum quality imgproxy can use per format, comma divided. Example: `jpeg=70,avif=40,webp=60`. When a value for the resulting format is not set, the `IMGPROXY_AUTOQUALITY_MAX` value is used. Default: `avif=50`
+* `IMGPROXY_AUTOQUALITY_ALLOWED_ERROR`: <i class='badge badge-pro'></i> the allowed `IMGPROXY_AUTOQUALITY_TARGET` error. Applicable only to `dssim` and `ml` methods. Default: 0.001
+* `IMGPROXY_AUTOQUALITY_MAX_RESOLUTION`: <i class='badge badge-pro'></i> when this value is greater then zero and the resultant resolution exceeds the value, autoquality won't be used. Default: 0
+* `IMGPROXY_AUTOQUALITY_JPEG_NET`: <i class='badge badge-pro'></i> the path to the neural network for JPEG.
+* `IMGPROXY_AUTOQUALITY_WEBP_NET`: <i class='badge badge-pro'></i> the path to the neural network for WebP.
+* `IMGPROXY_AUTOQUALITY_AVIF_NET`: <i class='badge badge-pro'></i> the path to the neural network for AVIF.
 
 ## AVIF/WebP support detection
 
@@ -222,12 +227,12 @@ imgproxy Pro can apply an unsharpening mask to your images.
 
 imgproxy can detect objects on the image and use them to perform smart cropping, to blur the detections, or to draw the detections.
 
-* `IMGPROXY_OBJECT_DETECTION_CONFIG`: <i class='badge badge-pro'></i> <i class='badge badge-v3'></i> the path to the neural network config. Default: blank
-* `IMGPROXY_OBJECT_DETECTION_WEIGHTS`: <i class='badge badge-pro'></i> <i class='badge badge-v3'></i> the path to the neural network weights. Default: blank
-* `IMGPROXY_OBJECT_DETECTION_CLASSES`: <i class='badge badge-pro'></i> <i class='badge badge-v3'></i> the path to the text file with the classes names, one per line. Default: blank
-* `IMGPROXY_OBJECT_DETECTION_NET_SIZE`: <i class='badge badge-pro'></i> <i class='badge badge-v3'></i> the size of the neural network input. The width and the heights of the inputs should be the same, so this config value should be a single number. Default: 416
-* `IMGPROXY_OBJECT_DETECTION_CONFIDENCE_THRESHOLD`: <i class='badge badge-pro'></i> <i class='badge badge-v3'></i> detections with confidences below this value will be discarded. Default: 0.2
-* `IMGPROXY_OBJECT_DETECTION_NMS_THRESHOLD`: <i class='badge badge-pro'></i> <i class='badge badge-v3'></i> non-max supression threshold. Don't change this if you don't know what you're doing. Default: 0.4
+* `IMGPROXY_OBJECT_DETECTION_CONFIG`: <i class='badge badge-pro'></i> the path to the neural network config. Default: blank
+* `IMGPROXY_OBJECT_DETECTION_WEIGHTS`: <i class='badge badge-pro'></i> the path to the neural network weights. Default: blank
+* `IMGPROXY_OBJECT_DETECTION_CLASSES`: <i class='badge badge-pro'></i> the path to the text file with the classes names, one per line. Default: blank
+* `IMGPROXY_OBJECT_DETECTION_NET_SIZE`: <i class='badge badge-pro'></i> the size of the neural network input. The width and the heights of the inputs should be the same, so this config value should be a single number. Default: 416
+* `IMGPROXY_OBJECT_DETECTION_CONFIDENCE_THRESHOLD`: <i class='badge badge-pro'></i> detections with confidences below this value will be discarded. Default: 0.2
+* `IMGPROXY_OBJECT_DETECTION_NMS_THRESHOLD`: <i class='badge badge-pro'></i> non-max supression threshold. Don't change this if you don't know what you're doing. Default: 0.4
 
 ## Fallback image
 
@@ -236,8 +241,8 @@ You can set up a fallback image that will be used in case imgproxy is unable to 
 * `IMGPROXY_FALLBACK_IMAGE_DATA`: Base64-encoded image data. You can easily calculate it with `base64 tmp/fallback.png | tr -d '\n'`.
 * `IMGPROXY_FALLBACK_IMAGE_PATH`: the path to the locally stored image
 * `IMGPROXY_FALLBACK_IMAGE_URL`: the fallback image URL
-* `IMGPROXY_FALLBACK_IMAGE_HTTP_CODE`: the <i class='badge badge-v3'></i> HTTP code for the fallback image response. When set to zero, imgproxy will respond with the usual HTTP code. Default: `200`
-* `IMGPROXY_FALLBACK_IMAGES_CACHE_SIZE`: <i class='badge badge-pro'></i> <i class='badge badge-v3'></i> the size of custom fallback images cache. When set to `0`, the fallback image cache is disabled. 256 fallback images are cached by default.
+* `IMGPROXY_FALLBACK_IMAGE_HTTP_CODE`: the HTTP code for the fallback image response. When set to zero, imgproxy will respond with the usual HTTP code. Default: `200`
+* `IMGPROXY_FALLBACK_IMAGES_CACHE_SIZE`: <i class='badge badge-pro'></i> the size of custom fallback images cache. When set to `0`, the fallback image cache is disabled. 256 fallback images are cached by default.
 
 ## Skip processing
 
@@ -341,7 +346,7 @@ Check out the [Prometheus](prometheus.md) guide to learn more.
 
 imgproxy can send its metrics to Datadog:
 
-* `IMGPROXY_DATADOG_ENABLE`: <i class='badge badge-v3'></i> when `true`, enables sending metrics to Datadog. Default: false
+* `IMGPROXY_DATADOG_ENABLE`: when `true`, enables sending metrics to Datadog. Default: false
 
 Check out the [Datadog](datadog.md) guide to learn more.
 
@@ -396,3 +401,5 @@ imgproxy can send logs to syslog, but this feature is disabled by default. To en
 * `IMGPROXY_STRIP_METADATA`: when `true`, imgproxy will strip all metadata (EXIF, IPTC, etc.) from JPEG and WebP output images. Default: `true`
 * `IMGPROXY_STRIP_COLOR_PROFILE`: when `true`, imgproxy will transform the embedded color profile (ICC) to sRGB and remove it from the image. Otherwise, imgproxy will try to keep it as is. Default: `true`
 * `IMGPROXY_AUTO_ROTATE`: when `true`, imgproxy will automatically rotate images based on the EXIF Orientation parameter (if available in the image meta data). The orientation tag will be removed from the image in all cases. Default: `true`
+* `IMGPROXY_HEALTH_CHECK_MESSAGE`: <i class='badge badge-pro'></i> the content of the health check response. Default: `imgproxy is running`
+* `IMGPROXY_HEALTH_CHECK_PATH`: an additional path of the health check. Default: blank

@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+## [3.3.0] - 2022-02-21
+### Added
+- Add the `IMGPROXY_MAX_REDIRECTS` config.
+- (pro) Add the `IMGPROXY_SERVER_NAME` config.
+- (pro) Add the `IMGPROXY_HEALTH_CHECK_MESSAGE` config.
+- Add the `IMGPROXY_HEALTH_CHECK_PATH` config.
+
 ## [3.2.2] - 2022-02-08
 ### Fix
 - Fix the `IMGPROXY_AVIF_SPEED` config.
