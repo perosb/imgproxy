@@ -85,8 +85,11 @@ type ProcessingOptions struct {
 	Sharpen           float32
 	Pixelate          int
 	StripMetadata     bool
+	KeepCopyright     bool
 	StripColorProfile bool
 	AutoRotate        bool
+	EnforceThumbnail  bool
+	ReturnAttachment  bool
 
 	SkipProcessingFormats []imagetype.Type
 
@@ -134,8 +137,11 @@ func NewProcessingOptions() *ProcessingOptions {
 			Dpr:               1,
 			Watermark:         WatermarkOptions{Opacity: 1, Replicate: false, Gravity: GravityOptions{Type: GravityCenter}},
 			StripMetadata:     config.StripMetadata,
+			KeepCopyright:     config.KeepCopyright,
 			StripColorProfile: config.StripColorProfile,
 			AutoRotate:        config.AutoRotate,
+			EnforceThumbnail:  config.EnforceThumbnail,
+			ReturnAttachment:  config.ReturnAttachment,
 
 			// Basically, we need this to update ETag when `IMGPROXY_QUALITY` is changed
 			defaultQuality: config.Quality,
@@ -815,6 +821,16 @@ func applyStripMetadataOption(po *ProcessingOptions, args []string) error {
 	return nil
 }
 
+func applyKeepCopyrightOption(po *ProcessingOptions, args []string) error {
+	if len(args) > 1 {
+		return fmt.Errorf("Invalid keep copyright arguments: %v", args)
+	}
+
+	po.KeepCopyright = parseBoolOption(args[0])
+
+	return nil
+}
+
 func applyStripColorProfileOption(po *ProcessingOptions, args []string) error {
 	if len(args) > 1 {
 		return fmt.Errorf("Invalid strip color profile arguments: %v", args)
@@ -831,6 +847,26 @@ func applyAutoRotateOption(po *ProcessingOptions, args []string) error {
 	}
 
 	po.AutoRotate = parseBoolOption(args[0])
+
+	return nil
+}
+
+func applyEnforceThumbnailOption(po *ProcessingOptions, args []string) error {
+	if len(args) > 1 {
+		return fmt.Errorf("Invalid enforce thumbnail arguments: %v", args)
+	}
+
+	po.EnforceThumbnail = parseBoolOption(args[0])
+
+	return nil
+}
+
+func applyReturnAttachmentOption(po *ProcessingOptions, args []string) error {
+	if len(args) > 1 {
+		return fmt.Errorf("Invalid return_attachment arguments: %v", args)
+	}
+
+	po.ReturnAttachment = parseBoolOption(args[0])
 
 	return nil
 }
@@ -883,8 +919,14 @@ func applyURLOption(po *ProcessingOptions, name string, args []string) error {
 		return applyWatermarkOption(po, args)
 	case "strip_metadata", "sm":
 		return applyStripMetadataOption(po, args)
+	case "keep_copyright", "kcr":
+		return applyKeepCopyrightOption(po, args)
 	case "strip_color_profile", "scp":
 		return applyStripColorProfileOption(po, args)
+	case "enforce_thumbnail", "eth":
+		return applyEnforceThumbnailOption(po, args)
+	case "return_attachment", "att":
+		return applyReturnAttachmentOption(po, args)
 	// Saving options
 	case "quality", "q":
 		return applyQualityOption(po, args)

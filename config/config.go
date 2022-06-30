@@ -47,8 +47,11 @@ var (
 	Quality               int
 	FormatQuality         map[imagetype.Type]int
 	StripMetadata         bool
+	KeepCopyright         bool
 	StripColorProfile     bool
 	AutoRotate            bool
+	EnforceThumbnail      bool
+	ReturnAttachment      bool
 
 	EnableWebpDetection bool
 	EnforceWebp         bool
@@ -76,19 +79,35 @@ var (
 
 	AllowedSources []*regexp.Regexp
 
+	SanitizeSvg bool
+
 	CookiePassthrough bool
 	CookieBaseURL     string
 
 	LocalFileSystemRoot string
-	S3Enabled           bool
-	S3Region            string
-	S3Endpoint          string
-	GCSEnabled          bool
-	GCSKey              string
-	ABSEnabled          bool
-	ABSName             string
-	ABSKey              string
-	ABSEndpoint         string
+
+	S3Enabled  bool
+	S3Region   string
+	S3Endpoint string
+
+	GCSEnabled  bool
+	GCSKey      string
+	GCSEndpoint string
+
+	ABSEnabled  bool
+	ABSName     string
+	ABSKey      string
+	ABSEndpoint string
+
+	SwiftEnabled               bool
+	SwiftUsername              string
+	SwiftAPIKey                string
+	SwiftAuthURL               string
+	SwiftDomain                string
+	SwiftTenant                string
+	SwiftAuthVersion           int
+	SwiftConnectTimeoutSeconds int
+	SwiftTimeoutSeconds        int
 
 	ETagEnabled bool
 	ETagBuster  string
@@ -107,6 +126,7 @@ var (
 	FallbackImagePath     string
 	FallbackImageURL      string
 	FallbackImageHTTPCode int
+	FallbackImageTTL      int
 
 	DataDogEnable bool
 
@@ -187,8 +207,11 @@ func Reset() {
 	Quality = 80
 	FormatQuality = map[imagetype.Type]int{imagetype.AVIF: 50}
 	StripMetadata = true
+	KeepCopyright = true
 	StripColorProfile = true
 	AutoRotate = true
+	EnforceThumbnail = false
+	ReturnAttachment = false
 
 	EnableWebpDetection = false
 	EnforceWebp = false
@@ -216,6 +239,8 @@ func Reset() {
 
 	AllowedSources = make([]*regexp.Regexp, 0)
 
+	SanitizeSvg = true
+
 	CookiePassthrough = false
 	CookieBaseURL = ""
 
@@ -229,6 +254,15 @@ func Reset() {
 	ABSName = ""
 	ABSKey = ""
 	ABSEndpoint = ""
+	SwiftEnabled = false
+	SwiftUsername = ""
+	SwiftAPIKey = ""
+	SwiftAuthURL = ""
+	SwiftAuthVersion = 0
+	SwiftTenant = ""
+	SwiftDomain = ""
+	SwiftConnectTimeoutSeconds = 10
+	SwiftTimeoutSeconds = 60
 
 	ETagEnabled = false
 	ETagBuster = ""
@@ -247,6 +281,7 @@ func Reset() {
 	FallbackImagePath = ""
 	FallbackImageURL = ""
 	FallbackImageHTTPCode = 200
+	FallbackImageTTL = 0
 
 	DataDogEnable = false
 
@@ -313,6 +348,8 @@ func Configure() error {
 
 	configurators.Patterns(&AllowedSources, "IMGPROXY_ALLOWED_SOURCES")
 
+	configurators.Bool(&SanitizeSvg, "IMGPROXY_SANITIZE_SVG")
+
 	configurators.Bool(&JpegProgressive, "IMGPROXY_JPEG_PROGRESSIVE")
 	configurators.Bool(&PngInterlaced, "IMGPROXY_PNG_INTERLACED")
 	configurators.Bool(&PngQuantize, "IMGPROXY_PNG_QUANTIZE")
@@ -323,8 +360,11 @@ func Configure() error {
 		return err
 	}
 	configurators.Bool(&StripMetadata, "IMGPROXY_STRIP_METADATA")
+	configurators.Bool(&KeepCopyright, "IMGPROXY_KEEP_COPYRIGHT")
 	configurators.Bool(&StripColorProfile, "IMGPROXY_STRIP_COLOR_PROFILE")
 	configurators.Bool(&AutoRotate, "IMGPROXY_AUTO_ROTATE")
+	configurators.Bool(&EnforceThumbnail, "IMGPROXY_ENFORCE_THUMBNAIL")
+	configurators.Bool(&ReturnAttachment, "IMGPROXY_RETURN_ATTACHMENT")
 
 	configurators.Bool(&EnableWebpDetection, "IMGPROXY_ENABLE_WEBP_DETECTION")
 	configurators.Bool(&EnforceWebp, "IMGPROXY_ENFORCE_WEBP")
@@ -376,11 +416,21 @@ func Configure() error {
 
 	configurators.Bool(&GCSEnabled, "IMGPROXY_USE_GCS")
 	configurators.String(&GCSKey, "IMGPROXY_GCS_KEY")
+	configurators.String(&GCSEndpoint, "IMGPROXY_GCS_ENDPOINT")
 
 	configurators.Bool(&ABSEnabled, "IMGPROXY_USE_ABS")
 	configurators.String(&ABSName, "IMGPROXY_ABS_NAME")
 	configurators.String(&ABSKey, "IMGPROXY_ABS_KEY")
 	configurators.String(&ABSEndpoint, "IMGPROXY_ABS_ENDPOINT")
+
+	configurators.Bool(&SwiftEnabled, "IMGPROXY_USE_SWIFT")
+	configurators.String(&SwiftUsername, "IMGPROXY_SWIFT_USERNAME")
+	configurators.String(&SwiftAPIKey, "IMGPROXY_SWIFT_API_KEY")
+	configurators.String(&SwiftAuthURL, "IMGPROXY_SWIFT_AUTH_URL")
+	configurators.String(&SwiftDomain, "IMGPROXY_SWIFT_DOMAIN")
+	configurators.String(&SwiftTenant, "IMGPROXY_SWIFT_TENANT")
+	configurators.Int(&SwiftConnectTimeoutSeconds, "IMGPROXY_SWIFT_CONNECT_TIMEOUT_SECONDS")
+	configurators.Int(&SwiftTimeoutSeconds, "IMGPROXY_SWIFT_TIMEOUT_SECONDS")
 
 	configurators.Bool(&ETagEnabled, "IMGPROXY_USE_ETAG")
 	configurators.String(&ETagBuster, "IMGPROXY_ETAG_BUSTER")
@@ -402,6 +452,7 @@ func Configure() error {
 	configurators.String(&FallbackImagePath, "IMGPROXY_FALLBACK_IMAGE_PATH")
 	configurators.String(&FallbackImageURL, "IMGPROXY_FALLBACK_IMAGE_URL")
 	configurators.Int(&FallbackImageHTTPCode, "IMGPROXY_FALLBACK_IMAGE_HTTP_CODE")
+	configurators.Int(&FallbackImageTTL, "IMGPROXY_FALLBACK_IMAGE_TTL")
 
 	configurators.Bool(&DataDogEnable, "IMGPROXY_DATADOG_ENABLE")
 

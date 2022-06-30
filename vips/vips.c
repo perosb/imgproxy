@@ -82,8 +82,13 @@ vips_svgload_go(void *buf, size_t len, double scale, VipsImage **out) {
 }
 
 int
-vips_heifload_go(void *buf, size_t len, VipsImage **out) {
-  return vips_heifload_buffer(buf, len, out, "access", VIPS_ACCESS_SEQUENTIAL, NULL);
+vips_heifload_go(void *buf, size_t len, VipsImage **out, int thumbnail) {
+  return vips_heifload_buffer(
+    buf, len, out,
+    "access", VIPS_ACCESS_SEQUENTIAL,
+    "thumbnail", thumbnail,
+    NULL
+  );
 }
 
 int
@@ -134,9 +139,14 @@ vips_band_format(VipsImage *in) {
 
 gboolean
 vips_is_animated(VipsImage * in) {
-  return( vips_image_get_typeof(in, "page-height") != G_TYPE_INVALID &&
-          vips_image_get_typeof(in, "gif-delay") != G_TYPE_INVALID &&
-          vips_image_get_typeof(in, "gif-loop") != G_TYPE_INVALID );
+  int n_pages;
+
+  return( vips_image_get_typeof(in, "delay") != G_TYPE_INVALID &&
+          vips_image_get_typeof(in, "loop") != G_TYPE_INVALID &&
+          vips_image_get_typeof(in, "page-height") == G_TYPE_INT &&
+          vips_image_get_typeof(in, "n-pages") == G_TYPE_INT &&
+          vips_image_get_int(in, "n-pages", &n_pages) == 0 &&
+          n_pages > 1 );
 }
 
 int
@@ -370,37 +380,50 @@ int
 vips_trim(VipsImage *in, VipsImage **out, double threshold,
           gboolean smart, double r, double g, double b,
           gboolean equal_hor, gboolean equal_ver) {
-  VipsImage *tmp;
 
-  if (vips_image_hasalpha(in)) {
-    if (vips_flatten_go(in, &tmp, 255.0, 0, 255.0))
+  VipsImage *base = vips_image_new();
+	VipsImage **t = (VipsImage **) vips_object_local_array(VIPS_OBJECT(base), 2);
+
+  VipsImage *tmp = in;
+
+  if (vips_image_guess_interpretation(in) != VIPS_INTERPRETATION_sRGB) {
+    if (vips_colourspace(in, &t[0], VIPS_INTERPRETATION_sRGB, NULL)) {
+      clear_image(&base);
       return 1;
-  } else {
-    if (vips_copy(in, &tmp, NULL))
-      return 1;
+    }
+    tmp = t[0];
   }
 
-  double *bg;
+  if (vips_image_hasalpha(tmp)) {
+    if (vips_flatten_go(tmp, &t[1], 255.0, 0, 255.0)) {
+      clear_image(&base);
+      return 1;
+    }
+    tmp = t[1];
+  }
+
+  double *bg = NULL;
   int bgn;
   VipsArrayDouble *bga;
 
   if (smart) {
     if (vips_getpoint(tmp, &bg, &bgn, 0, 0, NULL)) {
-      clear_image(&tmp);
+      clear_image(&base);
       return 1;
     }
     bga = vips_array_double_new(bg, bgn);
   } else {
     bga = vips_array_double_newv(3, r, g, b);
-    bg = 0;
   }
 
   int left, right, top, bot, width, height, diff;
+  int res = vips_find_trim(tmp, &left, &top, &width, &height, "background", bga, "threshold", threshold, NULL);
 
-  if (vips_find_trim(tmp, &left, &top, &width, &height, "background", bga, "threshold", threshold, NULL)) {
-    clear_image(&tmp);
-    vips_area_unref((VipsArea *)bga);
-    g_free(bg);
+  clear_image(&base);
+  vips_area_unref((VipsArea *)bga);
+  g_free(bg);
+
+  if (res) {
     return 1;
   }
 
@@ -425,10 +448,6 @@ vips_trim(VipsImage *in, VipsImage **out, double threshold,
       height -= diff;
     }
   }
-
-  clear_image(&tmp);
-  vips_area_unref((VipsArea *)bga);
-  g_free(bg);
 
   if (width == 0 || height == 0) {
     return vips_copy(in, out, NULL);
@@ -517,7 +536,7 @@ vips_arrayjoin_go(VipsImage **in, VipsImage **out, int n) {
 }
 
 int
-vips_strip(VipsImage *in, VipsImage **out) {
+vips_strip(VipsImage *in, VipsImage **out, int keep_exif_copyright) {
   static double default_resolution = 72.0 / 25.4;
 
   if (vips_copy(
@@ -534,6 +553,12 @@ vips_strip(VipsImage *in, VipsImage **out) {
 
     if (strcmp(name, VIPS_META_ICC_NAME) == 0) continue;
     if (strcmp(name, "palette-bit-depth") == 0) continue;
+
+    if (keep_exif_copyright) {
+      if (strcmp(name, VIPS_META_EXIF_NAME) == 0) continue;
+      if (strcmp(name, "exif-ifd0-Copyright") == 0) continue;
+      if (strcmp(name, "exif-ifd0-Artist") == 0) continue;
+    }
 
     vips_image_remove(*out, name);
   }

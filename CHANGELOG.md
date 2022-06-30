@@ -1,6 +1,54 @@
 # Changelog
 
 ## [Unreleased]
+### Add
+- Add support of 16-bit BMP.
+
+### Fix
+- Fix trimming of CMYK images.
+- Respond with 404 when the source image can not be found in OpenStack Object Storage.
+
+## [3.6.0] - 2022-06-13
+### Add
+- Add `IMGPROXY_RETURN_ATTACHMENT` config and [return_attachment](https://docs.imgproxy.net/generating_the_url?return-attachment) processing option.
+- Add SVG sanitization and `IMGPROXY_SANITIZE_SVG` config.
+
+### Change
+- Better animation detection.
+
+### Fix
+- Respond with 404 when file wasn't found in the local storage.
+
+## [3.5.1] - 2022-05-20
+### Change
+- Fallback from AVIF to JPEG/PNG if one of the result dimensions is smaller than 16px.
+
+### Fix
+- (pro) Fix some PDF pages background.
+- (docker) Fix loading some HEIF images.
+
+## [3.5.0] - 2022-04-25
+### Add
+- Add support of RLE-encoded BMP.
+- Add `IMGPROXY_ENFORCE_THUMBNAIL` config and [enforce_thumbnail](https://docs.imgproxy.net/generating_the_url?id=enforce-thumbnail) processing option.
+- Add `X-Result-Width` and `X-Result-Height` to debug headers.
+- Add `IMGPROXY_KEEP_COPYRIGHT` config and [keep_copyright](https://docs.imgproxy.net/generating_the_url?id=keep-copyright) processing option.
+
+### Change
+- Use thumbnail embedded to HEIC/AVIF if its size is larger than or equal to the requested.
+
+## [3.4.0] - 2022-04-07
+### Add
+- Add `IMGPROXY_FALLBACK_IMAGE_TTL` config.
+- (pro) Add [watermark_size](https://docs.imgproxy.net/generating_the_url?id=watermark-size) processing option.
+- Add OpenStack Object Storage ("Swift") support.
+- Add `IMGPROXY_GCS_ENDPOINT` config.
+
+### Change
+- (pro) Don't check `Content-Length` header of videos.
+
+### Fix
+- (pro) Fix custom watermarks on animated images.
 
 ## [3.3.3] - 2022-03-21
 ### Fix

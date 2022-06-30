@@ -115,6 +115,7 @@ func Cleanup() {
 }
 
 func Error() error {
+	defer C.vips_error_clear()
 	return ierrors.NewUnexpected(C.GoString(C.vips_error_buffer()), 1)
 }
 
@@ -228,13 +229,32 @@ func (img *Image) Load(imgdata *imagedata.ImageData, shrink int, scale float64, 
 	case imagetype.SVG:
 		err = C.vips_svgload_go(data, dataSize, C.double(scale), &tmp)
 	case imagetype.HEIC, imagetype.AVIF:
-		err = C.vips_heifload_go(data, dataSize, &tmp)
+		err = C.vips_heifload_go(data, dataSize, &tmp, C.int(0))
 	case imagetype.TIFF:
 		err = C.vips_tiffload_go(data, dataSize, &tmp)
 	default:
 		return errors.New("Usupported image type to load")
 	}
 	if err != 0 {
+		return Error()
+	}
+
+	C.swap_and_clear(&img.VipsImage, tmp)
+
+	return nil
+}
+
+func (img *Image) LoadThumbnail(imgdata *imagedata.ImageData) error {
+	if imgdata.Type != imagetype.HEIC && imgdata.Type != imagetype.AVIF {
+		return errors.New("Usupported image type to load thumbnail")
+	}
+
+	var tmp *C.VipsImage
+
+	data := unsafe.Pointer(&imgdata.Data[0])
+	dataSize := C.size_t(len(imgdata.Data))
+
+	if err := C.vips_heifload_go(data, dataSize, &tmp, C.int(1)); err != 0 {
 		return Error()
 	}
 
@@ -311,6 +331,10 @@ func (img *Image) Arrayjoin(in []*Image) error {
 
 	C.swap_and_clear(&img.VipsImage, tmp)
 	return nil
+}
+
+func (img *Image) Swap(in *Image) {
+	img.VipsImage, in.VipsImage = in.VipsImage, img.VipsImage
 }
 
 func (img *Image) IsAnimated() bool {
@@ -390,6 +414,18 @@ func (img *Image) GetIntSliceDefault(name string, def []int) ([]int, error) {
 	return img.GetIntSlice(name)
 }
 
+func (img *Image) GetBlob(name string) ([]byte, error) {
+	var (
+		tmp  unsafe.Pointer
+		size C.size_t
+	)
+
+	if C.vips_image_get_blob(img.VipsImage, cachedCString(name), &tmp, &size) != 0 {
+		return nil, Error()
+	}
+	return C.GoBytes(tmp, C.int(size)), nil
+}
+
 func (img *Image) SetInt(name string, value int) {
 	C.vips_image_set_int(img.VipsImage, cachedCString(name), C.int(value))
 }
@@ -400,6 +436,11 @@ func (img *Image) SetIntSlice(name string, value []int) {
 		in[i] = C.int(el)
 	}
 	C.vips_image_set_array_int_go(img.VipsImage, cachedCString(name), &in[0], C.int(len(value)))
+}
+
+func (img *Image) SetBlob(name string, value []byte) {
+	defer runtime.KeepAlive(value)
+	C.vips_image_set_blob_copy(img.VipsImage, cachedCString(name), unsafe.Pointer(&value[0]), C.size_t(len(value)))
 }
 
 func (img *Image) CastUchar() error {
@@ -726,10 +767,10 @@ func (img *Image) ApplyWatermark(wm *Image, opacity float64) error {
 	return nil
 }
 
-func (img *Image) Strip() error {
+func (img *Image) Strip(keepExifCopyright bool) error {
 	var tmp *C.VipsImage
 
-	if C.vips_strip(img.VipsImage, &tmp) != 0 {
+	if C.vips_strip(img.VipsImage, &tmp, gbool(keepExifCopyright)) != 0 {
 		return Error()
 	}
 	C.swap_and_clear(&img.VipsImage, tmp)
