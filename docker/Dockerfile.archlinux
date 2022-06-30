@@ -7,6 +7,7 @@ RUN echo "ParallelDownloads = 5" >> /etc/pacman.conf
 
 RUN \
 	pacman -Sy --noconfirm \
+	glibc \
 cfitsio \
 fftw \
 imagemagick \
@@ -47,13 +48,15 @@ FROM base as libheif
 # #COPY --from=aom /tmp/*.zst /tmp/
 # #RUN pacman -U /tmp/*.zst --noconfirm
 
-COPY docker/PKGBUILD.patch PKGBUILD.patch
+#COPY docker/PKGBUILD.patch PKGBUILD.patch
 RUN \
-	curl https://raw.githubusercontent.com/archlinux/svntogit-packages/packages/libheif/trunk/PKGBUILD -sLO && \
-	curl https://github.com/strukturag/libheif/commit/de0c159a60c2c50931321f06e36a3b6640c5c807.patch -sLO
+	#curl https://raw.githubusercontent.com/archlinux/svntogit-packages/packages/libheif/trunk/PKGBUILD -sLO && \
+	#curl https://github.com/strukturag/libheif/commit/de0c159a60c2c50931321f06e36a3b6640c5c807.patch -sLO
+	curl https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h=libheif-git -sL -o PKGBUILD
 RUN \
-	sed -i 's#make$#make -j6#' PKGBUILD && \
-	patch -p0 < PKGBUILD.patch && \
+	sed -i "s#'dav1d'##" PKGBUILD && \
+	sed -i "s#'rav1e'##" PKGBUILD && \
+	#patch -p0 < PKGBUILD.patch && \
 	sudo -u nobody makepkg --noconfirm 
 
 FROM base as libvips
@@ -77,7 +80,9 @@ COPY . .
 
 ENV CGO_LDFLAGS_ALLOW='-Wl,--no-as-needed,-s,-w'
 ENV CFLAGS=-O3
-RUN go build \
+RUN go version; \
+	go mod tidy; \
+	go build \
 	-v \
 	-ldflags='-s -w' \
 	-o /usr/local/bin/imgproxy
