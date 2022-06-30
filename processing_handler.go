@@ -22,6 +22,7 @@ import (
 	"github.com/imgproxy/imgproxy/v3/processing"
 	"github.com/imgproxy/imgproxy/v3/router"
 	"github.com/imgproxy/imgproxy/v3/security"
+	"github.com/imgproxy/imgproxy/v3/svg"
 	"github.com/imgproxy/imgproxy/v3/vips"
 )
 
@@ -49,6 +50,7 @@ func initProcessingHandler() {
 
 func setCacheControl(rw http.ResponseWriter, originHeaders map[string]string) {
 	var cacheControl, expires string
+	var ttl int
 
 	if config.CacheControlPassthrough && originHeaders != nil {
 		if val, ok := originHeaders["Cache-Control"]; ok {
@@ -60,8 +62,12 @@ func setCacheControl(rw http.ResponseWriter, originHeaders map[string]string) {
 	}
 
 	if len(cacheControl) == 0 && len(expires) == 0 {
-		cacheControl = fmt.Sprintf("max-age=%d, public", config.TTL)
-		expires = time.Now().Add(time.Second * time.Duration(config.TTL)).Format(http.TimeFormat)
+		ttl = config.TTL
+		if _, ok := originHeaders["Fallback-Image"]; ok && config.FallbackImageTTL > 0 {
+			ttl = config.FallbackImageTTL
+		}
+		cacheControl = fmt.Sprintf("max-age=%d, public", ttl)
+		expires = time.Now().Add(time.Second * time.Duration(ttl)).Format(http.TimeFormat)
 	}
 
 	if len(cacheControl) > 0 {
@@ -81,9 +87,9 @@ func setVary(rw http.ResponseWriter) {
 func respondWithImage(reqID string, r *http.Request, rw http.ResponseWriter, statusCode int, resultData *imagedata.ImageData, po *options.ProcessingOptions, originURL string, originData *imagedata.ImageData) {
 	var contentDisposition string
 	if len(po.Filename) > 0 {
-		contentDisposition = resultData.Type.ContentDisposition(po.Filename)
+		contentDisposition = resultData.Type.ContentDisposition(po.Filename, po.ReturnAttachment)
 	} else {
-		contentDisposition = resultData.Type.ContentDispositionFromURL(originURL)
+		contentDisposition = resultData.Type.ContentDispositionFromURL(originURL, po.ReturnAttachment)
 	}
 
 	rw.Header().Set("Content-Type", resultData.Type.Mime())
@@ -107,6 +113,8 @@ func respondWithImage(reqID string, r *http.Request, rw http.ResponseWriter, sta
 		rw.Header().Set("X-Origin-Content-Length", strconv.Itoa(len(originData.Data)))
 		rw.Header().Set("X-Origin-Width", resultData.Headers["X-Origin-Width"])
 		rw.Header().Set("X-Origin-Height", resultData.Headers["X-Origin-Height"])
+		rw.Header().Set("X-Result-Width", resultData.Headers["X-Result-Width"])
+		rw.Header().Set("X-Result-Height", resultData.Headers["X-Result-Height"])
 	}
 
 	rw.Header().Set("Content-Length", strconv.Itoa(len(resultData.Data)))
@@ -246,6 +254,7 @@ func handleProcessing(reqID string, rw http.ResponseWriter, r *http.Request) {
 		if config.FallbackImageHTTPCode > 0 {
 			statusCode = config.FallbackImageHTTPCode
 		}
+
 		originData = imagedata.FallbackImage
 	}
 
@@ -267,6 +276,22 @@ func handleProcessing(reqID string, rw http.ResponseWriter, r *http.Request) {
 	if originData.Type == po.Format || po.Format == imagetype.Unknown {
 		// Don't process SVG
 		if originData.Type == imagetype.SVG {
+			if config.SanitizeSvg {
+				sanitized, svgErr := svg.Satitize(originData.Data)
+				if svgErr != nil {
+					panic(svgErr)
+				}
+
+				// Since we'll replace origin data, it's better to close it to return
+				// it's buffer to the pool
+				originData.Close()
+
+				originData = &imagedata.ImageData{
+					Data: sanitized,
+					Type: imagetype.SVG,
+				}
+			}
+
 			respondWithImage(reqID, r, rw, statusCode, originData, po, imageURL, originData)
 			return
 		}

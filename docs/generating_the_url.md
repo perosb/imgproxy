@@ -80,7 +80,7 @@ width:%width
 w:%width
 ```
 
-Defines the width of the resulting image. When set to `0`, imgproxy will calculate width using the defined height and source aspect ratio. When set to `0` and rezizing type is `force`, imgproxy will keep the original width.
+Defines the width of the resulting image. When set to `0`, imgproxy will calculate width using the defined height and source aspect ratio. When set to `0` and resizing type is `force`, imgproxy will keep the original width.
 
 Default: `0`
 
@@ -91,7 +91,7 @@ height:%height
 h:%height
 ```
 
-Defines the height of the resulting image. When set to `0`, imgproxy will calculate resulting height using the defined width and source aspect ratio. When set to `0` and rezizing type is `force`, imgproxy will keep the original height.
+Defines the height of the resulting image. When set to `0`, imgproxy will calculate resulting height using the defined width and source aspect ratio. When set to `0` and resizing type is `force`, imgproxy will keep the original height.
 
 Default: `0`
 
@@ -367,7 +367,7 @@ sharpen:%sigma
 sh:%sigma
 ```
 
-When set, imgproxy will apply the sharpen filter to the resulting image. The valoe of `sigma` defines the size of the mask imgproxy will use.
+When set, imgproxy will apply the sharpen filter to the resulting image. The value of `sigma` defines the size of the mask imgproxy will use.
 
 As an approximate guideline, use 0.5 sigma for 4 pixels/mm (display resolution), 1.0 for 12 pixels/mm and 1.5 for 16 pixels/mm (300 dpi == 12 pixels/mm).
 
@@ -465,6 +465,23 @@ If you want to use a custom font, you need to put it in `/usr/share/fonts` insid
 
 Default: blank
 
+### Watermark Size<i class='badge badge-pro'></i> :id=watermark-size
+
+```
+watermark_size:%width:%height
+wms:%width:%height
+```
+
+Defines the desired width and height of the watermark. imgproxy always uses `fit` resizing type when resizing watermarks and enlarges them when needed.
+
+When `%width` is set to `0`, imgproxy will calculate the width using the defined height and watermark's aspect ratio.
+
+When `%height` is set to `0`, imgproxy will calculate the height using the defined width and watermark's aspect ratio.
+
+**📝Note:** This processing option takes effect only when the `scale` argument of the `watermark` option is set to zero.
+
+Default: `0:0`
+
 ### Style<i class='badge badge-pro'></i> :id=style
 
 ```
@@ -485,6 +502,15 @@ sm:%strip_metadata
 
 When set to `1`, `t` or `true`, imgproxy will strip the metadata (EXIF, IPTC, etc.) on JPEG and WebP output images. This is normally controlled by the [IMGPROXY_STRIP_METADATA](configuration.md#miscellaneous) configuration but this procesing option allows the configuration to be set for each request.
 
+### Keep Copyright
+
+```
+keep_copyright:%keep_copyright
+kcr:%keep_copyright
+```
+
+When set to `1`, `t` or `true`, imgproxy will not remove copyright info while stripping metadata. This is normally controlled by the [IMGPROXY_KEEP_COPYRIGHT](configuration.md#miscellaneous) configuration but this procesing option allows the configuration to be set for each request.
+
 ### Strip Color Profile
 
 ```
@@ -493,6 +519,24 @@ scp:%strip_color_profile
 ```
 
 When set to `1`, `t` or `true`, imgproxy will transform the embedded color profile (ICC) to sRGB and remove it from the image. Otherwise, imgproxy will try to keep it as is. This is normally controlled by the [IMGPROXY_STRIP_COLOR_PROFILE](configuration.md#miscellaneous) configuration but this procesing option allows the configuration to be set for each request.
+
+### Enforce thumbnail
+
+```
+enforce_thumbnail:%enforce_thumbnail
+eth:%enforce_thumbnail
+```
+
+When set to `1`, `t` or `true` and the source image has an embedded thumbnail, imgproxy will always use the embedded thumbnail instead of the main image. Currently, only thumbnails embedded in `heic` and `avif` are supported. This is normally controlled by the [IMGPROXY_ENFORCE_THUMBNAIL](configuration.md#miscellaneous) configuration but this procesing option allows the configuration to be set for each request.
+
+### Return attachment
+
+```
+return_attachment:%return_attachment
+att:%return_attachment
+```
+
+When set to `1`, `t` or `true`, imgproxy will return `attachment` in the `Content-Disposition` header, and the browser will open a 'Save as' dialog. This is normally controlled by the [IMGPROXY_RETURN_ATTACHMENT](configuration.md#miscellaneous) configuration but this procesing option allows the configuration to be set for each request.
 
 ### Quality
 
@@ -634,7 +678,7 @@ cachebuster:%string
 cb:%string
 ```
 
-Cache buster doesn't affect image processing but it's changing allows for bypassing the CDN, proxy server and browser cache. Useful when you have changed some things that are not reflected in the URL, like image quality settings, presets, or watermark data.
+Cache buster doesn't affect image processing but its changing allows for bypassing the CDN, proxy server and browser cache. Useful when you have changed some things that are not reflected in the URL, like image quality settings, presets, or watermark data.
 
 It's highly recommended to prefer the `cachebuster` option over a URL query string because that option can be properly signed.
 
@@ -681,7 +725,7 @@ There are two ways to specify the source url:
 
 ### Plain
 
-The source URL can be provided as is, prendended by the `/plain/` segment:
+The source URL can be provided as is, prepended by the `/plain/` segment:
 
 ```
 /plain/http://example.com/images/curiosity.jpg

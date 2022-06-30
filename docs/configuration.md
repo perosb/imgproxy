@@ -49,6 +49,8 @@ echo $(xxd -g 2 -l 64 -p /dev/random | tr -d '\n')
   * `X-Origin-Content-Length`: the size of the source image
   * `X-Origin-Width`: the width of the source image
   * `X-Origin-Height`: the height of the source image
+  * `X-Result-Width`: the width of the resultant image
+  * `X-Result-Height`: the height of the resultant image
 * `IMGPROXY_SERVER_NAME`: <i class='badge badge-pro'></i> the `Server` header value. Default: `imgproxy`
 
 ## Security
@@ -88,6 +90,8 @@ You can limit allowed source URLs with the following variable:
 * Bad: `http://example.com`
 * Good: `http://example.com/`
 If the trailing slash is absent, `http://example.com@baddomain.com` would be a permissable URL, however, the request would be made to `baddomain.com`.
+
+* `IMGPROXY_SANITIZE_SVG`: when true, imgproxy will remove scripts from SVG images to prevent XSS attacks. Defaut: `true`
 
 When using imgproxy in a development environment, it can be useful to ignore SSL verification:
 
@@ -242,6 +246,7 @@ You can set up a fallback image that will be used in case imgproxy is unable to 
 * `IMGPROXY_FALLBACK_IMAGE_PATH`: the path to the locally stored image
 * `IMGPROXY_FALLBACK_IMAGE_URL`: the fallback image URL
 * `IMGPROXY_FALLBACK_IMAGE_HTTP_CODE`: the HTTP code for the fallback image response. When set to zero, imgproxy will respond with the usual HTTP code. Default: `200`
+* `IMGPROXY_FALLBACK_IMAGE_TTL`: a duration (in seconds) sent via the `Expires` and `Cache-Control: max-age` HTTP headers when a fallback image was used. When blank or `0`, the value from `IMGPROXY_TTL` is used.
 * `IMGPROXY_FALLBACK_IMAGES_CACHE_SIZE`: <i class='badge badge-pro'></i> the size of custom fallback images cache. When set to `0`, the fallback image cache is disabled. 256 fallback images are cached by default.
 
 ## Skip processing
@@ -307,9 +312,11 @@ Check out the [Serving files from S3](serving_files_from_s3.md) guide to learn m
 
 ## Serving files from Google Cloud Storage
 
-imgproxy can process files from Google Cloud Storage buckets, but this feature is disabled by default. To enable it, set the value of `IMGPROXY_GCS_KEY` to the content of the Google Cloud JSON key:
+imgproxy can process files from Google Cloud Storage buckets, but this feature is disabled by default. To enable it, set the value of `IMGPROXY_USE_GCS` to `true`:
 
+* `IMGPROXY_USE_GCS`: when `true`, enables image fetching from Google Cloud Storage buckets. Default: `false`
 * `IMGPROXY_GCS_KEY`: the Google Cloud JSON key. When set, enables image fetching from Google Cloud Storage buckets. Default: blank
+* `IMGPROXY_GCS_ENDPOINT`: a custom Google Cloud Storage endpoint to being used by imgproxy
 
 Check out the [Serving files from Google Cloud Storage](serving_files_from_google_cloud_storage.md) guide to learn more.
 
@@ -323,6 +330,19 @@ imgproxy can process files from Azure Blob Storage containers, but this feature 
 * `IMGPROXY_ABS_ENDPOINT`: the custom Azure Blob Storage endpoint to be used by imgproxy. Default: blank
 
 Check out the [Serving files from Azure Blob Storage](serving_files_from_azure_blob_storage.md) guide to learn more.
+
+## Serving files from OpenStack Object Storage ("Swift")
+imgproxy can process files from OpenStack Object Storage, but this feature is disabled by default. To enable it, set `IMGPROXY_USE_SWIFT` to `true`.
+* `IMGPROXY_USE_SWIFT`: when `true`, enables image fetching from OpenStack Swift Object Storage. Default: `false`
+* `IMGPROXY_SWIFT_USERNAME`: the username for Swift API access. Default: blank
+* `IMGPROXY_SWIFT_API_KEY`: the API key for Swift API access. Default: blank
+* `IMGPROXY_SWIFT_AUTH_URL`: the Swift Auth URL. Default: blank
+* `IMGPROXY_SWIFT_AUTH_VERSION`: the Swift auth version, set to 1, 2 or 3 or leave at 0 for autodetect.
+* `IMGPROXY_SWIFT_TENANT`: the tenant name (optional, v2 auth only). Default: blank
+* `IMGPROXY_SWIFT_DOMAIN`: the Swift domain name (optional, v3 auth only): Default: blank
+* `IMGRPOXY_SWIFT_TIMEOUT_SECONDS`: the data channel timeout in seconds. Default: 60
+* `IMGRPOXY_SWIFT_CONNECT_TIMEOUT_SECONDS`: the connect channel timeout in seconds. Default: 10
+
 
 ## New Relic metrics
 
@@ -399,7 +419,10 @@ imgproxy can send logs to syslog, but this feature is disabled by default. To en
 * `IMGPROXY_USE_LINEAR_COLORSPACE`: when `true`, imgproxy will process images in linear colorspace. This will slow down processing. Note that images won't be fully processed in linear colorspace while shrink-on-load is enabled (see below).
 * `IMGPROXY_DISABLE_SHRINK_ON_LOAD`: when `true`, disables shrink-on-load for JPEGs and WebP files. Allows processing the entire image in linear colorspace but dramatically slows down resizing and increases memory usage when working with large images.
 * `IMGPROXY_STRIP_METADATA`: when `true`, imgproxy will strip all metadata (EXIF, IPTC, etc.) from JPEG and WebP output images. Default: `true`
+* `IMGPROXY_KEEP_COPYRIGHT`: when `true`, imgproxy will not remove copyright info while stripping metadata. Default: `true`
 * `IMGPROXY_STRIP_COLOR_PROFILE`: when `true`, imgproxy will transform the embedded color profile (ICC) to sRGB and remove it from the image. Otherwise, imgproxy will try to keep it as is. Default: `true`
 * `IMGPROXY_AUTO_ROTATE`: when `true`, imgproxy will automatically rotate images based on the EXIF Orientation parameter (if available in the image meta data). The orientation tag will be removed from the image in all cases. Default: `true`
+* `IMGPROXY_ENFORCE_THUMBNAIL`: when `true` and the source image has an embedded thumbnail, imgproxy will always use the embedded thumbnail instead of the main image. Currently, only thumbnails embedded in `heic` and `avif` are supported. Default: `false`
+* `IMGPROXY_RETURN_ATTACHMENT`: when `true`, response header `Content-Disposition` will include `attachment`. Default: `false`
 * `IMGPROXY_HEALTH_CHECK_MESSAGE`: <i class='badge badge-pro'></i> the content of the health check response. Default: `imgproxy is running`
 * `IMGPROXY_HEALTH_CHECK_PATH`: an additional path of the health check. Default: blank

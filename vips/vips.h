@@ -19,7 +19,7 @@ int vips_pngload_go(void *buf, size_t len, VipsImage **out);
 int vips_webpload_go(void *buf, size_t len, double scale, int pages, VipsImage **out);
 int vips_gifload_go(void *buf, size_t len, int pages, VipsImage **out);
 int vips_svgload_go(void *buf, size_t len, double scale, VipsImage **out);
-int vips_heifload_go(void *buf, size_t len, VipsImage **out);
+int vips_heifload_go(void *buf, size_t len, VipsImage **out, int thumbnail);
 int vips_tiffload_go(void *buf, size_t len, VipsImage **out);
 
 int vips_black_go(VipsImage **out, int width, int height, int bands);
@@ -79,7 +79,7 @@ int vips_apply_watermark(VipsImage *in, VipsImage *watermark, VipsImage **out, d
 
 int vips_arrayjoin_go(VipsImage **in, VipsImage **out, int n);
 
-int vips_strip(VipsImage *in, VipsImage **out);
+int vips_strip(VipsImage *in, VipsImage **out, int keep_exif_copyright);
 
 int vips_jpegsave_go(VipsImage *in, void **buf, size_t *len, int quality, int interlace);
 int vips_pngsave_go(VipsImage *in, void **buf, size_t *len, int interlace, int quantize, int colors);
