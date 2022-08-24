@@ -2,6 +2,7 @@ package processing
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"runtime"
 	"strconv"
@@ -27,19 +28,60 @@ var mainPipeline = pipeline{
 	scale,
 	rotateAndFlip,
 	cropToResult,
-	fixWebpSize,
 	applyFilters,
 	extend,
 	padding,
+	fixSize,
 	flatten,
 	watermark,
 	exportColorProfile,
 	finalize,
 }
 
-func imageTypeGoodForWeb(imgtype imagetype.Type) bool {
-	return imgtype != imagetype.TIFF &&
-		imgtype != imagetype.BMP
+func isImageTypePreferred(imgtype imagetype.Type) bool {
+	for _, t := range config.PreferredFormats {
+		if imgtype == t {
+			return true
+		}
+	}
+
+	return false
+}
+
+func findBestFormat(srcType imagetype.Type, animated, expectAlpha bool) imagetype.Type {
+	for _, t := range config.PreferredFormats {
+		if animated && !t.SupportsAnimation() {
+			continue
+		}
+
+		if expectAlpha && !t.SupportsAlpha() {
+			continue
+		}
+
+		return t
+	}
+
+	return config.PreferredFormats[0]
+}
+
+func ValidatePreferredFormats() error {
+	filtered := config.PreferredFormats[:0]
+
+	for _, t := range config.PreferredFormats {
+		if !vips.SupportsSave(t) {
+			log.Warnf("%s can't be a preferred format as it's saving is not supported", t)
+		} else {
+			filtered = append(filtered, t)
+		}
+	}
+
+	if len(filtered) == 0 {
+		return errors.New("No supported preferred formats specified")
+	}
+
+	config.PreferredFormats = filtered
+
+	return nil
 }
 
 func canFitToBytes(imgtype imagetype.Type) bool {
@@ -172,7 +214,9 @@ func saveImageToFitBytes(ctx context.Context, po *options.ProcessingOptions, img
 		}
 		imgdata.Close()
 
-		router.CheckTimeout(ctx)
+		if err := router.CheckTimeout(ctx); err != nil {
+			return nil, err
+		}
 
 		delta := float64(len(imgdata.Data)) / float64(po.MaxBytes)
 		switch {
@@ -223,6 +267,7 @@ func ProcessImage(ctx context.Context, imgdata *imagedata.ImageData, po *options
 	originWidth, originHeight := getImageSize(img)
 
 	animated := img.IsAnimated()
+	expectAlpha := !po.Flatten && (img.HasAlpha() || po.Padding.Enabled || po.Extend.Enabled)
 
 	switch {
 	case po.Format == imagetype.Unknown:
@@ -231,10 +276,10 @@ func ProcessImage(ctx context.Context, imgdata *imagedata.ImageData, po *options
 			po.Format = imagetype.AVIF
 		case po.PreferWebP:
 			po.Format = imagetype.WEBP
-		case vips.SupportsSave(imgdata.Type) && imageTypeGoodForWeb(imgdata.Type):
+		case isImageTypePreferred(imgdata.Type):
 			po.Format = imgdata.Type
 		default:
-			po.Format = imagetype.JPEG
+			po.Format = findBestFormat(imgdata.Type, animated, expectAlpha)
 		}
 	case po.EnforceAvif && !animated:
 		po.Format = imagetype.AVIF

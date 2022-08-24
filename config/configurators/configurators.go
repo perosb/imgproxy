@@ -76,6 +76,26 @@ func StringSliceFile(s *[]string, filepath string) error {
 	return nil
 }
 
+func StringMap(m *map[string]string, name string) error {
+	if env := os.Getenv(name); len(env) > 0 {
+		mm := make(map[string]string)
+
+		keyvalues := strings.Split(env, ";")
+
+		for _, keyvalue := range keyvalues {
+			parts := strings.SplitN(keyvalue, "=", 2)
+			if len(parts) != 2 {
+				return fmt.Errorf("Invalid key/value: %s", keyvalue)
+			}
+			mm[parts[0]] = parts[1]
+		}
+
+		*m = mm
+	}
+
+	return nil
+}
+
 func Bool(b *bool, name string) {
 	if env, err := strconv.ParseBool(os.Getenv(name)); err == nil {
 		*b = env
@@ -83,17 +103,17 @@ func Bool(b *bool, name string) {
 }
 
 func ImageTypes(it *[]imagetype.Type, name string) error {
-	*it = []imagetype.Type{}
-
 	if env := os.Getenv(name); len(env) > 0 {
 		parts := strings.Split(env, ",")
+
+		*it = make([]imagetype.Type, 0, len(parts))
 
 		for _, p := range parts {
 			pt := strings.TrimSpace(p)
 			if t, ok := imagetype.Types[pt]; ok {
 				*it = append(*it, t)
 			} else {
-				return fmt.Errorf("Unknown image format to skip: %s", pt)
+				return fmt.Errorf("Unknown image format: %s", pt)
 			}
 		}
 	}

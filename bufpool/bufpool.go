@@ -8,7 +8,7 @@ import (
 
 	"github.com/imgproxy/imgproxy/v3/config"
 	"github.com/imgproxy/imgproxy/v3/imath"
-	"github.com/imgproxy/imgproxy/v3/metrics/prometheus"
+	"github.com/imgproxy/imgproxy/v3/metrics"
 )
 
 type intSlice []int
@@ -69,11 +69,11 @@ func (p *Pool) calibrateAndClean() {
 		runtime.GC()
 	}
 
-	prometheus.SetBufferDefaultSize(p.name, p.defaultSize)
-	prometheus.SetBufferMaxSize(p.name, p.maxSize)
+	metrics.SetBufferDefaultSize(p.name, p.defaultSize)
+	metrics.SetBufferMaxSize(p.name, p.maxSize)
 }
 
-func (p *Pool) Get(size int) *bytes.Buffer {
+func (p *Pool) Get(size int, grow bool) *bytes.Buffer {
 	p.mutex.Lock()
 	defer p.mutex.Unlock()
 
@@ -115,7 +115,10 @@ func (p *Pool) Get(size int) *bytes.Buffer {
 
 	buf.Reset()
 
-	growSize := imath.Max(size, p.defaultSize)
+	growSize := p.defaultSize
+	if grow {
+		growSize = imath.Max(size, growSize)
+	}
 
 	if growSize > buf.Cap() {
 		buf.Grow(growSize)
@@ -145,8 +148,8 @@ func (p *Pool) Put(buf *bytes.Buffer) {
 		if b == nil {
 			p.buffers[i] = buf
 
-			if buf.Cap() > 0 {
-				prometheus.ObserveBufferSize(p.name, buf.Cap())
+			if buf.Len() > 0 {
+				metrics.ObserveBufferSize(p.name, buf.Cap())
 			}
 
 			return

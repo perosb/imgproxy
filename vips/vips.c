@@ -12,6 +12,9 @@
 #define VIPS_SUPPORT_GIFSAVE \
   (VIPS_MAJOR_VERSION > 8 || (VIPS_MAJOR_VERSION == 8 && VIPS_MINOR_VERSION >= 12))
 
+#define VIPS_GIF_RESOLUTION_LIMITED \
+  (VIPS_MAJOR_VERSION == 8 && VIPS_MINOR_VERSION <= 12)
+
 int
 vips_initialize() {
   return vips_init("imgproxy");
@@ -31,6 +34,16 @@ void
 swap_and_clear(VipsImage **in, VipsImage *out) {
   clear_image(in);
   *in = out;
+}
+
+int
+gif_resolution_limit() {
+#if VIPS_GIF_RESOLUTION_LIMITED
+  // https://github.com/libvips/libvips/blob/v8.12.2/libvips/foreign/cgifsave.c#L437-L442
+  return 2000 * 2000;
+#else
+  return INT_MAX / 4;
+#endif
 }
 
 int
@@ -112,12 +125,12 @@ int
 vips_get_orientation(VipsImage *image) {
   int orientation;
 
-	if (
+  if (
     vips_image_get_typeof(image, VIPS_META_ORIENTATION) == G_TYPE_INT &&
     vips_image_get_int(image, VIPS_META_ORIENTATION, &orientation) == 0
   ) return orientation;
 
-	return 1;
+  return 1;
 }
 
 int
@@ -129,7 +142,7 @@ vips_get_palette_bit_depth(VipsImage *image) {
     vips_image_get_int(image, "palette-bit-depth", &palette_bit_depth) == 0
   ) return palette_bit_depth;
 
-	return 0;
+  return 0;
 }
 
 VipsBandFormat
@@ -165,22 +178,6 @@ vips_addalpha_go(VipsImage *in, VipsImage **out) {
 }
 
 int
-vips_premultiply_go(VipsImage *in, VipsImage **out) {
-  if (!vips_image_hasalpha(in))
-    return vips_copy(in, out, NULL);
-
-  return vips_premultiply(in, out, NULL);
-}
-
-int
-vips_unpremultiply_go(VipsImage *in, VipsImage **out) {
-  if (!vips_image_hasalpha(in))
-    return vips_copy(in, out, NULL);
-
-  return vips_unpremultiply(in, out, NULL);
-}
-
-int
 vips_copy_go(VipsImage *in, VipsImage **out) {
   return vips_copy(in, out, NULL);
 }
@@ -192,7 +189,7 @@ vips_cast_go(VipsImage *in, VipsImage **out, VipsBandFormat format) {
 
 int
 vips_rad2float_go(VipsImage *in, VipsImage **out) {
-	return vips_rad2float(in, out, NULL);
+  return vips_rad2float(in, out, NULL);
 }
 
 int
@@ -203,7 +200,7 @@ vips_resize_go(VipsImage *in, VipsImage **out, double wscale, double hscale) {
   VipsBandFormat format = vips_band_format(in);
 
   VipsImage *base = vips_image_new();
-	VipsImage **t = (VipsImage **) vips_object_local_array(VIPS_OBJECT(base), 3);
+  VipsImage **t = (VipsImage **) vips_object_local_array(VIPS_OBJECT(base), 3);
 
   int res =
     vips_premultiply(in, &t[0], NULL) ||
@@ -213,55 +210,6 @@ vips_resize_go(VipsImage *in, VipsImage **out, double wscale, double hscale) {
 
   clear_image(&base);
 
-  return 0;
-}
-
-int
-vips_pixelate(VipsImage *in, VipsImage **out, int pixels) {
-  VipsImage *base = vips_image_new();
-  VipsImage **t = (VipsImage **) vips_object_local_array(VIPS_OBJECT(base), 3);
-
-  int w, h, tw, th;
-
-  w = in->Xsize;
-  h = in->Ysize;
-
-  tw = (int)((double)(w + pixels - 1) / pixels) * pixels;
-  th = (int)((double)(h + pixels - 1) / pixels) * pixels;
-
-  if (tw > w || th > h) {
-    if (vips_embed(in, &t[0], 0, 0, tw, th, "extend", VIPS_EXTEND_COPY, NULL)) {
-      clear_image(&base);
-      return 1;
-    }
-  } else {
-    if (vips_copy(in, &t[0], NULL)) {
-      clear_image(&base);
-      return 1;
-    }
-  }
-
-  if (
-    vips_shrink(t[0], &t[1], pixels, pixels, NULL) ||
-    vips_zoom(t[1], &t[2], pixels, pixels, NULL)
-  ) {
-      clear_image(&base);
-      return 1;
-  }
-
-  if (tw > w || th > h) {
-    if (vips_extract_area(t[2], out, 0, 0, w, h, NULL)) {
-        clear_image(&base);
-        return 1;
-    }
-  } else {
-    if (vips_copy(t[2], out, NULL)) {
-        clear_image(&base);
-        return 1;
-    }
-  }
-
-  clear_image(&base);
   return 0;
 }
 
@@ -351,13 +299,100 @@ vips_smartcrop_go(VipsImage *in, VipsImage **out, int width, int height) {
 }
 
 int
-vips_gaussblur_go(VipsImage *in, VipsImage **out, double sigma) {
-  return vips_gaussblur(in, out, sigma, NULL);
-}
+vips_apply_filters(VipsImage *in, VipsImage **out, double blur_sigma,
+  double sharp_sigma, int pixelate_pixels) {
 
-int
-vips_sharpen_go(VipsImage *in, VipsImage **out, double sigma) {
-  return vips_sharpen(in, out, "sigma", sigma, NULL);
+  VipsImage *base = vips_image_new();
+  VipsImage **t = (VipsImage **) vips_object_local_array(VIPS_OBJECT(base), 9);
+
+  VipsInterpretation interpretation = in->Type;
+  VipsBandFormat format = in->BandFmt;
+  gboolean premultiplied = FALSE;
+
+  if ((blur_sigma > 0 || sharp_sigma > 0) && vips_image_hasalpha(in)) {
+    if (vips_premultiply(in, &t[0], NULL)) {
+      clear_image(&base);
+      return 1;
+    }
+
+    in = t[0];
+    premultiplied = TRUE;
+  }
+
+  if (blur_sigma > 0.0) {
+    if (vips_gaussblur(in, &t[1], blur_sigma, NULL)) {
+      clear_image(&base);
+      return 1;
+    }
+
+    in = t[1];
+  }
+
+  if (sharp_sigma > 0.0) {
+    if (vips_sharpen(in, &t[2], "sigma", sharp_sigma, NULL)) {
+      clear_image(&base);
+      return 1;
+    }
+
+    in = t[2];
+  }
+
+  pixelate_pixels = VIPS_MIN(pixelate_pixels, VIPS_MAX(in->Xsize, in->Ysize));
+
+  if (pixelate_pixels > 1) {
+    int w, h, tw, th;
+
+    w = in->Xsize;
+    h = in->Ysize;
+
+    tw = (int)(VIPS_CEIL((double)w / pixelate_pixels)) * pixelate_pixels;
+    th = (int)(VIPS_CEIL((double)h / pixelate_pixels)) * pixelate_pixels;
+
+    if (tw > w || th > h) {
+      if (vips_embed(in, &t[3], 0, 0, tw, th, "extend", VIPS_EXTEND_MIRROR, NULL)) {
+        clear_image(&base);
+        return 1;
+      }
+
+      in = t[3];
+    }
+
+    if (
+      vips_shrink(in, &t[4], pixelate_pixels, pixelate_pixels, NULL) ||
+      vips_zoom(t[4], &t[5], pixelate_pixels, pixelate_pixels, NULL)
+    ) {
+        clear_image(&base);
+        return 1;
+    }
+
+    in = t[5];
+
+    if (tw > w || th > h) {
+      if (vips_extract_area(in, &t[6], 0, 0, w, h, NULL)) {
+          clear_image(&base);
+          return 1;
+      }
+
+      in = t[6];
+    }
+  }
+
+  if (premultiplied) {
+    if (vips_unpremultiply(in, &t[7], NULL)) {
+      clear_image(&base);
+      return 1;
+    }
+
+    in = t[7];
+  }
+
+  int res =
+    vips_colourspace(in, &t[8], interpretation, NULL) ||
+    vips_cast(t[8], out, format, NULL);
+
+  clear_image(&base);
+
+  return res;
 }
 
 int
@@ -382,7 +417,7 @@ vips_trim(VipsImage *in, VipsImage **out, double threshold,
           gboolean equal_hor, gboolean equal_ver) {
 
   VipsImage *base = vips_image_new();
-	VipsImage **t = (VipsImage **) vips_object_local_array(VIPS_OBJECT(base), 2);
+  VipsImage **t = (VipsImage **) vips_object_local_array(VIPS_OBJECT(base), 2);
 
   VipsImage *tmp = in;
 
@@ -463,9 +498,9 @@ vips_replicate_go(VipsImage *in, VipsImage **out, int width, int height) {
   if (vips_replicate(in, &tmp, 1 + width / in->Xsize, 1 + height / in->Ysize, NULL))
     return 1;
 
-	if (vips_extract_area(tmp, out, 0, 0, width, height, NULL)) {
+  if (vips_extract_area(tmp, out, 0, 0, width, height, NULL)) {
     clear_image(&tmp);
-		return 1;
+    return 1;
   }
 
   clear_image(&tmp);
@@ -497,24 +532,24 @@ vips_ensure_alpha(VipsImage *in, VipsImage **out) {
 int
 vips_apply_watermark(VipsImage *in, VipsImage *watermark, VipsImage **out, double opacity) {
   VipsImage *base = vips_image_new();
-	VipsImage **t = (VipsImage **) vips_object_local_array(VIPS_OBJECT(base), 6);
+  VipsImage **t = (VipsImage **) vips_object_local_array(VIPS_OBJECT(base), 6);
 
   if (vips_ensure_alpha(watermark, &t[0])) {
     clear_image(&base);
-		return 1;
+    return 1;
   }
 
-	if (opacity < 1) {
+  if (opacity < 1) {
     if (
       vips_extract_band(t[0], &t[1], 0, "n", t[0]->Bands - 1, NULL) ||
       vips_extract_band(t[0], &t[2], t[0]->Bands - 1, "n", 1, NULL) ||
-		  vips_linear1(t[2], &t[3], opacity, 0, NULL) ||
+      vips_linear1(t[2], &t[3], opacity, 0, NULL) ||
       vips_bandjoin2(t[1], t[3], &t[4], NULL)
     ) {
       clear_image(&base);
-			return 1;
-		}
-	} else {
+      return 1;
+    }
+  } else {
     if (vips_copy(t[0], &t[4], NULL)) {
       clear_image(&base);
       return 1;
@@ -591,6 +626,8 @@ vips_pngsave_go(VipsImage *in, void **buf, size_t *len, int interlace, int quant
   } else {
     bitdepth = vips_get_palette_bit_depth(in);
     if (bitdepth) {
+      if (bitdepth > 4) bitdepth = 8;
+      else if (bitdepth > 2) bitdepth = 4;
       quantize = 1;
       colors = 1 << bitdepth;
     }

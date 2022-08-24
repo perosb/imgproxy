@@ -16,14 +16,15 @@ import (
 )
 
 var (
-	Network          string
-	Bind             string
-	ReadTimeout      int
-	WriteTimeout     int
-	KeepAliveTimeout int
-	DownloadTimeout  int
-	Concurrency      int
-	MaxClients       int
+	Network           string
+	Bind              string
+	ReadTimeout       int
+	WriteTimeout      int
+	KeepAliveTimeout  int
+	DownloadTimeout   int
+	Concurrency       int
+	RequestsQueueSize int
+	MaxClients        int
 
 	TTL                     int
 	CacheControlPassthrough bool
@@ -58,6 +59,8 @@ var (
 	EnableAvifDetection bool
 	EnforceAvif         bool
 	EnableClientHints   bool
+
+	PreferredFormats []imagetype.Type
 
 	SkipProcessingFormats []imagetype.Type
 
@@ -128,10 +131,12 @@ var (
 	FallbackImageHTTPCode int
 	FallbackImageTTL      int
 
-	DataDogEnable bool
+	DataDogEnable        bool
+	DataDogEnableMetrics bool
 
 	NewRelicAppName string
 	NewRelicKey     string
+	NewRelicLabels  map[string]string
 
 	PrometheusBind      string
 	PrometheusNamespace string
@@ -183,9 +188,10 @@ func Reset() {
 	KeepAliveTimeout = 10
 	DownloadTimeout = 5
 	Concurrency = runtime.NumCPU() * 2
-	MaxClients = 0
+	RequestsQueueSize = 0
+	MaxClients = 2048
 
-	TTL = 3600
+	TTL = 31536000
 	CacheControlPassthrough = false
 	SetCanonicalHeader = false
 
@@ -218,6 +224,15 @@ func Reset() {
 	EnableAvifDetection = false
 	EnforceAvif = false
 	EnableClientHints = false
+
+	PreferredFormats = []imagetype.Type{
+		imagetype.JPEG,
+		imagetype.PNG,
+		imagetype.GIF,
+		imagetype.WEBP,
+		imagetype.AVIF,
+		imagetype.ICO,
+	}
 
 	SkipProcessingFormats = make([]imagetype.Type, 0)
 
@@ -287,6 +302,7 @@ func Reset() {
 
 	NewRelicAppName = ""
 	NewRelicKey = ""
+	NewRelicLabels = make(map[string]string)
 
 	PrometheusBind = ""
 	PrometheusNamespace = ""
@@ -328,6 +344,7 @@ func Configure() error {
 	configurators.Int(&KeepAliveTimeout, "IMGPROXY_KEEP_ALIVE_TIMEOUT")
 	configurators.Int(&DownloadTimeout, "IMGPROXY_DOWNLOAD_TIMEOUT")
 	configurators.Int(&Concurrency, "IMGPROXY_CONCURRENCY")
+	configurators.Int(&RequestsQueueSize, "IMGPROXY_REQUESTS_QUEUE_SIZE")
 	configurators.Int(&MaxClients, "IMGPROXY_MAX_CLIENTS")
 
 	configurators.Int(&TTL, "IMGPROXY_TTL")
@@ -373,6 +390,10 @@ func Configure() error {
 	configurators.Bool(&EnableClientHints, "IMGPROXY_ENABLE_CLIENT_HINTS")
 
 	configurators.String(&HealthCheckPath, "IMGPROXY_HEALTH_CHECK_PATH")
+
+	if err := configurators.ImageTypes(&PreferredFormats, "IMGPROXY_PREFERRED_FORMATS"); err != nil {
+		return err
+	}
 
 	if err := configurators.ImageTypes(&SkipProcessingFormats, "IMGPROXY_SKIP_PROCESSING_FORMATS"); err != nil {
 		return err
@@ -455,9 +476,11 @@ func Configure() error {
 	configurators.Int(&FallbackImageTTL, "IMGPROXY_FALLBACK_IMAGE_TTL")
 
 	configurators.Bool(&DataDogEnable, "IMGPROXY_DATADOG_ENABLE")
+	configurators.Bool(&DataDogEnableMetrics, "IMGPROXY_DATADOG_ENABLE_ADDITIONAL_METRICS")
 
 	configurators.String(&NewRelicAppName, "IMGPROXY_NEW_RELIC_APP_NAME")
 	configurators.String(&NewRelicKey, "IMGPROXY_NEW_RELIC_KEY")
+	configurators.StringMap(&NewRelicLabels, "IMGPROXY_NEW_RELIC_LABELS")
 
 	configurators.String(&PrometheusBind, "IMGPROXY_PROMETHEUS_BIND")
 	configurators.String(&PrometheusNamespace, "IMGPROXY_PROMETHEUS_NAMESPACE")
@@ -516,8 +539,12 @@ func Configure() error {
 		return fmt.Errorf("Concurrency should be greater than 0, now - %d\n", Concurrency)
 	}
 
-	if MaxClients <= 0 {
-		MaxClients = Concurrency * 10
+	if RequestsQueueSize < 0 {
+		return fmt.Errorf("Requests queue size should be greater than or equal 0, now - %d\n", RequestsQueueSize)
+	}
+
+	if MaxClients < 0 {
+		return fmt.Errorf("Concurrency should be greater than or equal 0, now - %d\n", MaxClients)
 	}
 
 	if TTL <= 0 {
@@ -552,6 +579,10 @@ func Configure() error {
 		return fmt.Errorf("Quality should be greater than 0, now - %d\n", Quality)
 	} else if Quality > 100 {
 		return fmt.Errorf("Quality can't be greater than 100, now - %d\n", Quality)
+	}
+
+	if len(PreferredFormats) == 0 {
+		return fmt.Errorf("At least one preferred format should be specified")
 	}
 
 	if IgnoreSslVerification {

@@ -11,7 +11,7 @@ if [[ $BUILDPLATFORM != $TARGETPLATFORM ]]; then
       ;;
 
     arm64 | "arm64/v8" | "linux/arm64" | "linux/arm64/v8")
-      BUILDPLATFORM="arm64"
+      BUILD_ARCH="arm64"
       ;;
 
     *)
@@ -49,4 +49,4 @@ if [[ $BUILDPLATFORM != $TARGETPLATFORM ]]; then
   export GOARCH=$TARGET_ARCH
 fi
 
-go $@
+go build -v -ldflags "-s -w" -o /usr/local/bin/imgproxy

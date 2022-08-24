@@ -8,7 +8,6 @@ import (
 
 	"github.com/imgproxy/imgproxy/v3/config"
 	"github.com/imgproxy/imgproxy/v3/ierrors"
-	"github.com/imgproxy/imgproxy/v3/metrics"
 )
 
 type timerSinceCtxKey = struct{}
@@ -27,19 +26,21 @@ func ctxTime(ctx context.Context) time.Duration {
 	return 0
 }
 
-func CheckTimeout(ctx context.Context) {
+func CheckTimeout(ctx context.Context) error {
 	select {
 	case <-ctx.Done():
 		d := ctxTime(ctx)
 
-		if ctx.Err() != context.DeadlineExceeded {
-			panic(ierrors.New(499, fmt.Sprintf("Request was cancelled after %v", d), "Cancelled"))
+		err := ctx.Err()
+		switch err {
+		case context.Canceled:
+			return ierrors.New(499, fmt.Sprintf("Request was cancelled after %v", d), "Cancelled")
+		case context.DeadlineExceeded:
+			return ierrors.New(http.StatusServiceUnavailable, fmt.Sprintf("Request was timed out after %v", d), "Timeout")
+		default:
+			return err
 		}
-
-		metrics.SendTimeout(ctx, d)
-
-		panic(ierrors.New(503, fmt.Sprintf("Timeout after %v", d), "Timeout"))
 	default:
-		// Go ahead
+		return nil
 	}
 }

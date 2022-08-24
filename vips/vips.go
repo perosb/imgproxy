@@ -21,6 +21,8 @@ import (
 	"github.com/imgproxy/imgproxy/v3/ierrors"
 	"github.com/imgproxy/imgproxy/v3/imagedata"
 	"github.com/imgproxy/imgproxy/v3/imagetype"
+	"github.com/imgproxy/imgproxy/v3/metrics/datadog"
+	"github.com/imgproxy/imgproxy/v3/metrics/newrelic"
 	"github.com/imgproxy/imgproxy/v3/metrics/prometheus"
 )
 
@@ -31,6 +33,8 @@ type Image struct {
 var (
 	typeSupportLoad sync.Map
 	typeSupportSave sync.Map
+
+	gifResolutionLimit int
 )
 
 var vipsConf struct {
@@ -69,6 +73,8 @@ func Init() error {
 		C.vips_cache_set_trace(C.gboolean(1))
 	}
 
+	gifResolutionLimit = int(C.gif_resolution_limit())
+
 	vipsConf.JpegProgressive = gbool(config.JpegProgressive)
 	vipsConf.PngInterlaced = gbool(config.PngInterlaced)
 	vipsConf.PngQuantize = gbool(config.PngQuantize)
@@ -90,6 +96,14 @@ func Init() error {
 		"A gauge of the number of active vips allocations.",
 		GetAllocs,
 	)
+
+	datadog.AddGaugeFunc("vips.memory", GetMem)
+	datadog.AddGaugeFunc("vips.max_memory", GetMemHighwater)
+	datadog.AddGaugeFunc("vips.allocs", GetAllocs)
+
+	newrelic.AddGaugeFunc("vips.memory", GetMem)
+	newrelic.AddGaugeFunc("vips.max_memory", GetMemHighwater)
+	newrelic.AddGaugeFunc("vips.allocs", GetAllocs)
 
 	return nil
 }
@@ -181,6 +195,10 @@ func SupportsSave(it imagetype.Type) bool {
 	typeSupportSave.Store(it, sup)
 
 	return sup
+}
+
+func GifResolutionLimit() int {
+	return gifResolutionLimit
 }
 
 func gbool(b bool) C.gboolean {
@@ -345,28 +363,6 @@ func (img *Image) HasAlpha() bool {
 	return C.vips_image_hasalpha(img.VipsImage) > 0
 }
 
-func (img *Image) Premultiply() error {
-	var tmp *C.VipsImage
-
-	if C.vips_premultiply_go(img.VipsImage, &tmp) != 0 {
-		return Error()
-	}
-
-	C.swap_and_clear(&img.VipsImage, tmp)
-	return nil
-}
-
-func (img *Image) Unpremultiply() error {
-	var tmp *C.VipsImage
-
-	if C.vips_unpremultiply_go(img.VipsImage, &tmp) != 0 {
-		return Error()
-	}
-
-	C.swap_and_clear(&img.VipsImage, tmp)
-	return nil
-}
-
 func (img *Image) GetInt(name string) (int, error) {
 	var i C.int
 
@@ -481,18 +477,6 @@ func (img *Image) Resize(wscale, hscale float64) error {
 	return nil
 }
 
-func (img *Image) Pixelate(pixels int) error {
-	var tmp *C.VipsImage
-
-	if C.vips_pixelate(img.VipsImage, &tmp, C.int(pixels)) != 0 {
-		return Error()
-	}
-
-	C.swap_and_clear(&img.VipsImage, tmp)
-
-	return nil
-}
-
 func (img *Image) Orientation() C.int {
 	return C.vips_get_orientation(img.VipsImage)
 }
@@ -591,25 +575,15 @@ func (img *Image) Flatten(bg Color) error {
 	return nil
 }
 
-func (img *Image) Blur(sigma float32) error {
+func (img *Image) ApplyFilters(blurSigma, sharpSigma float32, pixelatePixels int) error {
 	var tmp *C.VipsImage
 
-	if C.vips_gaussblur_go(img.VipsImage, &tmp, C.double(sigma)) != 0 {
+	if C.vips_apply_filters(img.VipsImage, &tmp, C.double(blurSigma), C.double(sharpSigma), C.int(pixelatePixels)) != 0 {
 		return Error()
 	}
 
 	C.swap_and_clear(&img.VipsImage, tmp)
-	return nil
-}
 
-func (img *Image) Sharpen(sigma float32) error {
-	var tmp *C.VipsImage
-
-	if C.vips_sharpen_go(img.VipsImage, &tmp, C.double(sigma)) != 0 {
-		return Error()
-	}
-
-	C.swap_and_clear(&img.VipsImage, tmp)
 	return nil
 }
 

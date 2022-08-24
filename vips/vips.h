@@ -11,8 +11,7 @@ void g_free_go(void **buf);
 
 void swap_and_clear(VipsImage **in, VipsImage *out);
 
-int vips_type_find_load_go(int imgtype);
-int vips_type_find_save_go(int imgtype);
+int gif_resolution_limit();
 
 int vips_jpegload_go(void *buf, size_t len, int shrink, VipsImage **out);
 int vips_pngload_go(void *buf, size_t len, VipsImage **out);
@@ -35,8 +34,6 @@ int vips_image_get_array_int_go(VipsImage *image, const char *name, int **out, i
 void vips_image_set_array_int_go(VipsImage *image, const char *name, const int *array, int n);
 
 int vips_addalpha_go(VipsImage *in, VipsImage **out);
-int vips_premultiply_go(VipsImage *in, VipsImage **out);
-int vips_unpremultiply_go(VipsImage *in, VipsImage **out);
 
 int vips_copy_go(VipsImage *in, VipsImage **out);
 
@@ -44,8 +41,6 @@ int vips_cast_go(VipsImage *in, VipsImage **out, VipsBandFormat format);
 int vips_rad2float_go(VipsImage *in, VipsImage **out);
 
 int vips_resize_go(VipsImage *in, VipsImage **out, double wscale, double hscale);
-
-int vips_pixelate(VipsImage *in, VipsImage **out, int pixels);
 
 int vips_icc_is_srgb_iec61966(VipsImage *in);
 int vips_has_embedded_icc(VipsImage *in);
@@ -65,8 +60,7 @@ int vips_trim(VipsImage *in, VipsImage **out, double threshold,
               gboolean smart, double r, double g, double b,
               gboolean equal_hor, gboolean equal_ver);
 
-int vips_gaussblur_go(VipsImage *in, VipsImage **out, double sigma);
-int vips_sharpen_go(VipsImage *in, VipsImage **out, double sigma);
+int vips_apply_filters(VipsImage *in, VipsImage **out, double blur_sigma, double sharp_sigma, int pixelate_pixels);
 
 int vips_flatten_go(VipsImage *in, VipsImage **out, double r, double g, double b);
 

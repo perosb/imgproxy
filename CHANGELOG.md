@@ -1,12 +1,42 @@
 # Changelog
 
 ## [Unreleased]
+
+## [3.7.2] - 2022-08-22
+### Changed
+- (docker) Faster images quantization.
+- (docker) Faster loading of GIF.
+
+## [3.7.1] - 2022-08-01
+### Fix
+- Fix memory bloat in some cases.
+- Fix `format_quality` usage in presets.
+
+## [3.7.0] - 2022-07-27
 ### Add
 - Add support of 16-bit BMP.
+- Add `IMGPROXY_NEW_RELIC_LABELS` config.
+- Add support of JPEG files with differential Huffman coding or arithmetic coding.
+- Add `IMGPROXY_PREFERRED_FORMATS` config.
+- Add `IMGPROXY_REQUESTS_QUEUE_SIZE` config.
+- Add `requests_in_progress` and `images_in_progress` metrics.
+- Add queue segment/span to request traces.
+- Add sending additional metrics to Datadog and `IMGPROXY_DATADOG_ENABLE_ADDITIONAL_METRICS` config.
+- Add sending additional metrics to New Relic.
+
+### Change
+- Change `IMGPROXY_MAX_CLIENTS` default value to 2048.
+- Allow unlimited connections when `IMGPROXY_MAX_CLIENTS` is set to `0`.
+- Change `IMGPROXY_TTL` default value to `31536000` (1 year).
+- Better errors tracking with metrics services.
+- (docker) Faster and better saving of GIF.
+- (docker) Faster saving of AVIF.
+- (docker) Faster loading and saving of PNG.
 
 ### Fix
 - Fix trimming of CMYK images.
 - Respond with 404 when the source image can not be found in OpenStack Object Storage.
+- Respond with 404 when file wasn't found in the GCS storage.
 
 ## [3.6.0] - 2022-06-13
 ### Add

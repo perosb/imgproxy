@@ -1,4 +1,4 @@
-ARG BASE_IMAGE_VERSION="v3.2.4"
+ARG BASE_IMAGE_VERSION="v3.3.1"
 
 FROM darthsim/imgproxy-base:${BASE_IMAGE_VERSION}
 
@@ -6,7 +6,7 @@ ARG BUILDPLATFORM
 ARG TARGETPLATFORM
 
 COPY . .
-RUN docker/go.sh build -v -ldflags "-s -w" -o /usr/local/bin/imgproxy
+RUN docker/build.sh
 
 # ==================================================================================================
 # Final image

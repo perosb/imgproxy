@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/subtle"
 	"fmt"
+	golog "log"
 	"net/http"
 	"time"
 
@@ -45,12 +46,21 @@ func startServer(cancel context.CancelFunc) (*http.Server, error) {
 	if err != nil {
 		return nil, fmt.Errorf("Can't start server: %s", err)
 	}
-	l = netutil.LimitListener(l, config.MaxClients)
+
+	if config.MaxClients > 0 {
+		l = netutil.LimitListener(l, config.MaxClients)
+	}
+
+	errLogger := golog.New(
+		log.WithField("source", "http_server").WriterLevel(log.ErrorLevel),
+		"", 0,
+	)
 
 	s := &http.Server{
 		Handler:        buildRouter(),
 		ReadTimeout:    time.Duration(config.ReadTimeout) * time.Second,
 		MaxHeaderBytes: 1 << 20,
+		ErrorLog:       errLogger,
 	}
 
 	if config.KeepAliveTimeout > 0 {
