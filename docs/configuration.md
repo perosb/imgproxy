@@ -73,13 +73,19 @@ To check if the source image is SVG, imgproxy reads some amount of bytes; by def
 
 Requests to some image sources may go through too many redirects or enter an infinite loop. You can limit the number of allowed redirects:
 
-* `IMGPROXY_MAX_REDIRECTS`: the max number of redirects imgproxy can follow while requesting the source image
+* `IMGPROXY_MAX_REDIRECTS`: the max number of redirects imgproxy can follow while requesting the source image. When set to `0`, no redirects are allowed. Default: `10`
 
 You can also specify a secret key to enable authorization with the HTTP `Authorization` header for use in production environments:
 
 * `IMGPROXY_SECRET`: the authorization token. If specified, the HTTP request should contain the `Authorization: Bearer %secret%` header.
 
-imgproxy does not send CORS headers by default. CORS will need to be allowed by uisng the following variable:
+If you don't want to reveal your source URLs, you can encrypt them with the AES-CBC algorithm:
+
+* `IMGPROXY_SOURCE_URL_ENCRYPTION_KEY`: hex-encoded key used for source URL encryption. Default: blank
+
+**📝Note:** Read more about source URL encryption in the [encrypting the source URL guide](encrypting_the_source_url.md).
+
+imgproxy does not send CORS headers by default. CORS will need to be allowed by using the following variable:
 
 * `IMGPROXY_ALLOW_ORIGIN`: when specified, enables CORS headers with the provided origin. CORS headers are disabled by default.
 
