@@ -413,6 +413,24 @@ dd:%draw:%class_name1:%class_name2:...:%class_nameN
 
 When `draw` is set to `1`, `t` or `true`, imgproxy [detects objects](object_detection.md) of the provided classes and draws their bounding boxes. If class names are omitted, imgproxy draws the bounding boxes of all the detected objects.
 
+### Gradient![pro](/assets/pro.svg) :id=gradient
+
+```
+gradient:%opacity:%color:%direction:%start%stop
+gr:%opacity:%color:%direction:%start%stop
+```
+
+Places a gradient on the processed image. The placed gradient transitions from transparency to the specified color.
+
+* `opacity`: specifies gradient opacity. When set to `0`, gradient is not applied.
+* `color`:  _(optional)_ a hex-coded value of the gradient color. Default: `000` (black).
+* `direction`: _(optional)_ specifies the direction of the gradient. Available values:
+  * `down`: _(default)_ the top side of the gradient is transparrent, the bottom side is opaque
+  * `up`: the bottom side of the gradient is transparrent, the top side is opaque
+  * `right`: the left side of the gradient is transparrent, the right side is opaque
+  * `left`: the right side of the gradient is transparrent, the left side is opaque
+* `start`, `stop`: floating point numbers that define relative positions of where the gradient starts and where it ends. Default values are `0.0` and `1.0` respectively.
+
 ### Watermark
 
 ```
@@ -481,6 +499,16 @@ When `%height` is set to `0`, imgproxy will calculate the height using the defin
 **📝Note:** This processing option takes effect only when the `scale` argument of the `watermark` option is set to zero.
 
 Default: `0:0`
+
+### Watermark Shadow![pro](/assets/pro.svg) :id=watermark-shadow
+
+```
+watermark_shadow:%sigma
+wmsh:%sigma
+```
+When set, imgproxy will add a shadow to the watermark. The value of `sigma` defines the size of the mask imgproxy will use to blur the shadow.
+
+Default: disabled
 
 ### Style![pro](/assets/pro.svg) :id=style
 
@@ -625,6 +653,17 @@ When a source image supports pagination (PDF, TIFF) or animation (GIF, WebP), th
 
 Default: 0
 
+### Disable animation![pro](/assets/pro.svg) :id=disable-animation
+
+```
+disable_animation:%disable
+da:%disable
+```
+
+When set to `1`, `t` or `true`, imgproxy will use a single frame of animated images. Use the [page](#page) option to specify which frame imgproxy should use.
+
+Default: `false`
+
 ### Video thumbnail second![pro](/assets/pro.svg) :id=video-thumbnail-second
 
 ```
@@ -765,7 +804,7 @@ When using an encoded source URL, you can specify the [extension](#extension) af
 /aHR0cDovL2V4YW1w/bGUuY29tL2ltYWdl/cy9jdXJpb3NpdHku/anBn.png
 ```
 
-#### Encrypted with AES-CBC
+### Encrypted with AES-CBC
 
 The source URL can be encrypted with the AES-CBC algorithm, prepended by the `/enc/` segment. The encrypted URL can be split with `/` as desired:
 

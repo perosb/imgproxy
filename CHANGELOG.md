@@ -2,8 +2,36 @@
 
 ## [Unreleased]
 ### Add
+- Add `IMGPROXY_OPEN_TELEMETRY_GRPC_INSECURE` config.
+- Better XMP data stripping.
+- (pro) Add XMP data to the `/info` response.
+
+## [3.10.0] - 2022-11-04
+### Add
+- Add `IMGPROXY_CLIENT_KEEP_ALIVE_TIMEOUT` config.
+- (pro) Add [disable_animation](https://docs.imgproxy.net/latest/generating_the_url?id=disable-animation) processing option.
+- (pro) Add [gradient](https://docs.imgproxy.net/latest/generating_the_url?id=gradient) processing option.
+
+### Fix
+- Fix false-positive SVG detections.
+- Fix possible infinite loop during SVG sanitization.
+- (pro) Fix saving of GIF with variable frame delay to MP4.
+- (pro) Fix the size of video thumbnails if the video has a defined sample aspect ratio.
+
+## [3.9.0] - 2022-10-19
+### Add
+- Add `IMGPROXY_SVG_FIX_UNSUPPORTED` config.
+
+### Fix
+- Fix fix HTTP response status when OpenTelemetry support is enabled.
+- (docker) Fix saving of paletted PNGs with low bit-depth.
+
+## [3.8.0] - 2022-10-06
+### Add
 - Add [raw](https://docs.imgproxy.net/latest/generating_the_url?id=raw) processing option.
+- Add [OpenTelemetry](https://docs.imgproxy.net/latest/open_telemetry) support.
 - (pro) Add encrypted source URL support.
+- (pro) Add [watermark_shadow](https://docs.imgproxy.net/generating_the_url?id=watermark-shadow) processing option.
 
 ### Changed
 - Try to fix some invalid source URL cases that happen because of URL normalization.

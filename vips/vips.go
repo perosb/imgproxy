@@ -23,6 +23,7 @@ import (
 	"github.com/imgproxy/imgproxy/v3/imagetype"
 	"github.com/imgproxy/imgproxy/v3/metrics/datadog"
 	"github.com/imgproxy/imgproxy/v3/metrics/newrelic"
+	"github.com/imgproxy/imgproxy/v3/metrics/otel"
 	"github.com/imgproxy/imgproxy/v3/metrics/prometheus"
 )
 
@@ -104,6 +105,25 @@ func Init() error {
 	newrelic.AddGaugeFunc("vips.memory", GetMem)
 	newrelic.AddGaugeFunc("vips.max_memory", GetMemHighwater)
 	newrelic.AddGaugeFunc("vips.allocs", GetAllocs)
+
+	otel.AddGaugeFunc(
+		"vips_memory_bytes",
+		"A gauge of the vips tracked memory usage in bytes.",
+		"By",
+		GetMem,
+	)
+	otel.AddGaugeFunc(
+		"vips_max_memory_bytes",
+		"A gauge of the max vips tracked memory usage in bytes.",
+		"By",
+		GetMemHighwater,
+	)
+	otel.AddGaugeFunc(
+		"vips_allocs",
+		"A gauge of the number of active vips allocations.",
+		"By",
+		GetAllocs,
+	)
 
 	return nil
 }
@@ -546,17 +566,6 @@ func (img *Image) Trim(threshold float64, smart bool, color Color, equalHor bool
 	if C.vips_trim(img.VipsImage, &tmp, C.double(threshold),
 		gbool(smart), C.double(color.R), C.double(color.G), C.double(color.B),
 		gbool(equalHor), gbool(equalVer)) != 0 {
-		return Error()
-	}
-
-	C.swap_and_clear(&img.VipsImage, tmp)
-	return nil
-}
-
-func (img *Image) EnsureAlpha() error {
-	var tmp *C.VipsImage
-
-	if C.vips_ensure_alpha(img.VipsImage, &tmp) != 0 {
 		return Error()
 	}
 

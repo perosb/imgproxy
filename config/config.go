@@ -16,15 +16,16 @@ import (
 )
 
 var (
-	Network           string
-	Bind              string
-	ReadTimeout       int
-	WriteTimeout      int
-	KeepAliveTimeout  int
-	DownloadTimeout   int
-	Concurrency       int
-	RequestsQueueSize int
-	MaxClients        int
+	Network                string
+	Bind                   string
+	ReadTimeout            int
+	WriteTimeout           int
+	KeepAliveTimeout       int
+	ClientKeepAliveTimeout int
+	DownloadTimeout        int
+	Concurrency            int
+	RequestsQueueSize      int
+	MaxClients             int
 
 	TTL                     int
 	CacheControlPassthrough bool
@@ -53,6 +54,7 @@ var (
 	AutoRotate            bool
 	EnforceThumbnail      bool
 	ReturnAttachment      bool
+	SvgFixUnsupported     bool
 
 	EnableWebpDetection bool
 	EnforceWebp         bool
@@ -141,6 +143,17 @@ var (
 	PrometheusBind      string
 	PrometheusNamespace string
 
+	OpenTelemetryEndpoint          string
+	OpenTelemetryProtocol          string
+	OpenTelemetryServiceName       string
+	OpenTelemetryEnableMetrics     bool
+	OpenTelemetryServerCert        string
+	OpenTelemetryClientCert        string
+	OpenTelemetryClientKey         string
+	OpenTelemetryGRPCInsecure      bool
+	OpenTelemetryPropagators       []string
+	OpenTelemetryConnectionTimeout int
+
 	BugsnagKey   string
 	BugsnagStage string
 
@@ -186,6 +199,7 @@ func Reset() {
 	ReadTimeout = 10
 	WriteTimeout = 10
 	KeepAliveTimeout = 10
+	ClientKeepAliveTimeout = 90
 	DownloadTimeout = 5
 	Concurrency = runtime.NumCPU() * 2
 	RequestsQueueSize = 0
@@ -218,6 +232,7 @@ func Reset() {
 	AutoRotate = true
 	EnforceThumbnail = false
 	ReturnAttachment = false
+	SvgFixUnsupported = false
 
 	EnableWebpDetection = false
 	EnforceWebp = false
@@ -307,6 +322,17 @@ func Reset() {
 	PrometheusBind = ""
 	PrometheusNamespace = ""
 
+	OpenTelemetryEndpoint = ""
+	OpenTelemetryProtocol = "grpc"
+	OpenTelemetryServiceName = "imgproxy"
+	OpenTelemetryEnableMetrics = false
+	OpenTelemetryServerCert = ""
+	OpenTelemetryClientCert = ""
+	OpenTelemetryClientKey = ""
+	OpenTelemetryGRPCInsecure = true
+	OpenTelemetryPropagators = make([]string, 0)
+	OpenTelemetryConnectionTimeout = 5
+
 	BugsnagKey = ""
 	BugsnagStage = "production"
 
@@ -342,6 +368,7 @@ func Configure() error {
 	configurators.Int(&ReadTimeout, "IMGPROXY_READ_TIMEOUT")
 	configurators.Int(&WriteTimeout, "IMGPROXY_WRITE_TIMEOUT")
 	configurators.Int(&KeepAliveTimeout, "IMGPROXY_KEEP_ALIVE_TIMEOUT")
+	configurators.Int(&ClientKeepAliveTimeout, "IMGPROXY_CLIENT_KEEP_ALIVE_TIMEOUT")
 	configurators.Int(&DownloadTimeout, "IMGPROXY_DOWNLOAD_TIMEOUT")
 	configurators.Int(&Concurrency, "IMGPROXY_CONCURRENCY")
 	configurators.Int(&RequestsQueueSize, "IMGPROXY_REQUESTS_QUEUE_SIZE")
@@ -382,6 +409,7 @@ func Configure() error {
 	configurators.Bool(&AutoRotate, "IMGPROXY_AUTO_ROTATE")
 	configurators.Bool(&EnforceThumbnail, "IMGPROXY_ENFORCE_THUMBNAIL")
 	configurators.Bool(&ReturnAttachment, "IMGPROXY_RETURN_ATTACHMENT")
+	configurators.Bool(&SvgFixUnsupported, "IMGPROXY_SVG_FIX_UNSUPPORTED")
 
 	configurators.Bool(&EnableWebpDetection, "IMGPROXY_ENABLE_WEBP_DETECTION")
 	configurators.Bool(&EnforceWebp, "IMGPROXY_ENFORCE_WEBP")
@@ -485,6 +513,17 @@ func Configure() error {
 	configurators.String(&PrometheusBind, "IMGPROXY_PROMETHEUS_BIND")
 	configurators.String(&PrometheusNamespace, "IMGPROXY_PROMETHEUS_NAMESPACE")
 
+	configurators.String(&OpenTelemetryEndpoint, "IMGPROXY_OPEN_TELEMETRY_ENDPOINT")
+	configurators.String(&OpenTelemetryProtocol, "IMGPROXY_OPEN_TELEMETRY_PROTOCOL")
+	configurators.String(&OpenTelemetryServiceName, "IMGPROXY_OPEN_TELEMETRY_SERVICE_NAME")
+	configurators.Bool(&OpenTelemetryEnableMetrics, "IMGPROXY_OPEN_TELEMETRY_ENABLE_METRICS")
+	configurators.String(&OpenTelemetryServerCert, "IMGPROXY_OPEN_TELEMETRY_SERVER_CERT")
+	configurators.String(&OpenTelemetryClientCert, "IMGPROXY_OPEN_TELEMETRY_CLIENT_CERT")
+	configurators.String(&OpenTelemetryClientKey, "IMGPROXY_OPEN_TELEMETRY_CLIENT_KEY")
+	configurators.Bool(&OpenTelemetryGRPCInsecure, "IMGPROXY_OPEN_TELEMETRY_GRPC_INSECURE")
+	configurators.StringSlice(&OpenTelemetryPropagators, "IMGPROXY_OPEN_TELEMETRY_PROPAGATORS")
+	configurators.Int(&OpenTelemetryConnectionTimeout, "IMGPROXY_OPEN_TELEMETRY_CONNECTION_TIMEOUT")
+
 	configurators.String(&BugsnagKey, "IMGPROXY_BUGSNAG_KEY")
 	configurators.String(&BugsnagStage, "IMGPROXY_BUGSNAG_STAGE")
 	configurators.String(&HoneybadgerKey, "IMGPROXY_HONEYBADGER_KEY")
@@ -529,6 +568,9 @@ func Configure() error {
 	}
 	if KeepAliveTimeout < 0 {
 		return fmt.Errorf("KeepAlive timeout should be greater than or equal to 0, now - %d\n", KeepAliveTimeout)
+	}
+	if ClientKeepAliveTimeout < 0 {
+		return fmt.Errorf("Client KeepAlive timeout should be greater than or equal to 0, now - %d\n", ClientKeepAliveTimeout)
 	}
 
 	if DownloadTimeout <= 0 {
@@ -622,6 +664,10 @@ func Configure() error {
 
 	if len(PrometheusBind) > 0 && PrometheusBind == Bind {
 		return fmt.Errorf("Can't use the same binding for the main server and Prometheus")
+	}
+
+	if OpenTelemetryConnectionTimeout < 1 {
+		return fmt.Errorf("OpenTelemetry connection timeout should be greater than zero")
 	}
 
 	if FreeMemoryInterval <= 0 {

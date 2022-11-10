@@ -31,6 +31,7 @@ echo $(xxd -g 2 -l 64 -p /dev/random | tr -d '\n')
 * `IMGPROXY_READ_TIMEOUT`: the maximum duration (in seconds) for reading the entire image request, including the body. Default: `10`
 * `IMGPROXY_WRITE_TIMEOUT`: the maximum duration (in seconds) for writing the response. Default: `10`
 * `IMGPROXY_KEEP_ALIVE_TIMEOUT`: the maximum duration (in seconds) to wait for the next request before closing the connection. When set to `0`, keep-alive is disabled. Default: `10`
+* `IMGPROXY_CLIENT_KEEP_ALIVE_TIMEOUT`: the maximum duration (in seconds) to wait for the next request before closing the HTTP client connection. The HTTP client is used to download source images. When set to `0`, keep-alive is disabled. Default: `90`
 * `IMGPROXY_DOWNLOAD_TIMEOUT`: the maximum duration (in seconds) for downloading the source image. Default: `5`
 * `IMGPROXY_CONCURRENCY`: the maximum number of image requests to be processed simultaneously. Requests that exceed this limit are put in the queue. Default: the number of CPU cores multiplied by two
 * `IMGPROXY_REQUESTS_QUEUE_SIZE`: the maximum number of image requests that can be put in the queue. Requests that exceed this limit are rejected with `429` HTTP status. When set to `0`, the requests queue is unlimited. Default: `0`
@@ -141,8 +142,6 @@ When cookie forwarding is activated, by default, imgproxy assumes the scope of t
   * `6`: Table from DCTune Perceptual Optimization of Compressed Dental X-Rays (1997)
   * `7`: Table from A Visual Detection Model for DCT Coefficient Quantization (1993)
   * `8`: Table from An Improved Detection Model for DCT Coefficient Quantization (1993)
-
-**📝Note:** `IMGPROXY_JPEG_TRELLIS_QUANT`, `IMGPROXY_JPEG_OVERSHOOT_DERINGING`, `IMGPROXY_JPEG_OPTIMIZE_SCANS`, and `IMGPROXY_JPEG_QUANT_TABLE` require libvips to be built with [MozJPEG](https://github.com/mozilla/mozjpeg) since standard libjpeg doesn't support those optimizations.
 
 ### Advanced PNG compression
 
@@ -397,6 +396,23 @@ imgproxy can send its metrics to Datadog:
 
 Check out the [Datadog](datadog.md) guide to learn more.
 
+## OpenTelemetry metrics
+
+imgproxy can send request traces to an OpenTelemetry collector:
+
+* `IMGPROXY_OPEN_TELEMETRY_ENDPOINT`: OpenTelemetry collector endpoint (`host:port`). Default: blank
+* `IMGPROXY_OPEN_TELEMETRY_PROTOCOL`: OpenTelemetry collector protocol. Supported protocols are `grpc`, `https`, and `http`. Default: `grpc`
+* `IMGPROXY_OPEN_TELEMETRY_SERVICE_NAME`: OpenTelemetry service name. Default: `imgproxy`
+* `IMGPROXY_OPEN_TELEMETRY_ENABLE_METRICS`: when `true`, imgproxy will send metrics over OpenTelemetry Metrics API. Default: `false`
+* `IMGPROXY_OPEN_TELEMETRY_SERVER_CERT`: OpenTelemetry collector TLS certificate, PEM-encoded. Default: blank
+* `IMGPROXY_OPEN_TELEMETRY_CLIENT_CERT`: OpenTelemetry client TLS certificate, PEM-encoded. Default: blank
+* `IMGPROXY_OPEN_TELEMETRY_CLIENT_KEY`: OpenTelemetry client TLS key, PEM-encoded. Default: blank
+* `IMGPROXY_OPEN_TELEMETRY_GRPC_INSECURE`: when `true`, imgproxy will use an insecure GRPC connection unless the collector TLS certificate is not provided. Default: `true`
+* `IMGPROXY_OPEN_TELEMETRY_PROPAGATORS`: a list of OpenTelemetry text map propagators, comma divided. Supported propagators are `tracecontext`, `baggage`, `b3`, `b3multi`, `jaeger`, `xray`, and `ottrace`. Default: blank
+* `IMGPROXY_OPEN_TELEMETRY_CONNECTION_TIMEOUT`: the maximum duration (in seconds) for establishing a connection to the OpenTelemetry collector. Default: `5`
+
+Check out the [OpenTelemetry](open_telemetry.md) guide to learn more.
+
 ## Error reporting
 
 imgproxy can report occurred errors to Bugsnag, Honeybadger and Sentry:
@@ -419,6 +435,7 @@ imgproxy can report occurred errors to Bugsnag, Honeybadger and Sentry:
   * `pretty`: _(default)_ colored human-readable format
   * `structured`: machine-readable format
   * `json`: JSON format
+  * `gcp`: Google Cloud Logging agent compliant
 * `IMGPROXY_LOG_LEVEL`: the log level. The following levels are supported `error`, `warn`, `info` and `debug`. Default: `info`
 
 imgproxy can send logs to syslog, but this feature is disabled by default. To enable it, set `IMGPROXY_SYSLOG_ENABLE` to `true`:
@@ -451,5 +468,6 @@ imgproxy can send logs to syslog, but this feature is disabled by default. To en
 * `IMGPROXY_AUTO_ROTATE`: when `true`, imgproxy will automatically rotate images based on the EXIF Orientation parameter (if available in the image meta data). The orientation tag will be removed from the image in all cases. Default: `true`
 * `IMGPROXY_ENFORCE_THUMBNAIL`: when `true` and the source image has an embedded thumbnail, imgproxy will always use the embedded thumbnail instead of the main image. Currently, only thumbnails embedded in `heic` and `avif` are supported. Default: `false`
 * `IMGPROXY_RETURN_ATTACHMENT`: when `true`, response header `Content-Disposition` will include `attachment`. Default: `false`
+* `IMGPROXY_SVG_FIX_UNSUPPORTED`: when `true`, imgproxy will try to replace SVG features unsupported by librsvg to minimize SVG rendering error. This config only takes effect on SVG rasterization. Default: `false`
 * `IMGPROXY_HEALTH_CHECK_MESSAGE`: ![pro](/assets/pro.svg) the content of the health check response. Default: `imgproxy is running`
 * `IMGPROXY_HEALTH_CHECK_PATH`: an additional path of the health check. Default: blank
