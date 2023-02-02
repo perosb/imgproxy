@@ -4,8 +4,10 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/felixge/httpsnoop"
@@ -29,7 +31,7 @@ import (
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	semconv "go.opentelemetry.io/otel/semconv/v1.4.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.12.0"
 	"go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
@@ -38,6 +40,7 @@ import (
 	"github.com/imgproxy/imgproxy/v3/ierrors"
 	"github.com/imgproxy/imgproxy/v3/metrics/errformat"
 	"github.com/imgproxy/imgproxy/v3/metrics/stats"
+	"github.com/imgproxy/imgproxy/v3/version"
 )
 
 type hasSpanCtxKey struct{}
@@ -85,9 +88,12 @@ func Init() error {
 		return err
 	}
 
-	res := resource.NewWithAttributes(
-		semconv.SchemaURL,
-		semconv.ServiceNameKey.String(config.OpenTelemetryServiceName),
+	res, _ := resource.Merge(
+		resource.Default(),
+		resource.NewSchemaless(
+			semconv.ServiceNameKey.String(config.OpenTelemetryServiceName),
+			semconv.ServiceVersionKey.String(version.Version()),
+		),
 	)
 
 	awsRes, _ := resource.Detect(
@@ -97,18 +103,32 @@ func Init() error {
 		eks.NewResourceDetector(),
 	)
 
-	if awsRes != nil {
-		res, _ = resource.Merge(res, awsRes)
+	if merged, merr := resource.Merge(awsRes, res); merr == nil {
+		res = merged
+	} else {
+		logrus.Warnf("Can't add AWS attributes to OpenTelemetry: %s", merr)
 	}
 
-	idg := xray.NewIDGenerator()
-
-	tracerProvider = sdktrace.NewTracerProvider(
+	opts := []sdktrace.TracerProviderOption{
 		sdktrace.WithResource(res),
-		sdktrace.WithSampler(sdktrace.AlwaysSample()),
 		sdktrace.WithBatcher(traceExporter),
-		sdktrace.WithIDGenerator(idg),
-	)
+	}
+
+	if opts, err = addTraceIDRatioSampler(opts); err != nil {
+		return err
+	}
+
+	switch g := config.OpenTelemetryTraceIDGenerator; g {
+	case "xray":
+		idg := xray.NewIDGenerator()
+		opts = append(opts, sdktrace.WithIDGenerator(idg))
+	case "random":
+		// Do nothing. OTel uses random generator by default
+	default:
+		return fmt.Errorf("Unknown Trace ID generator: %s", g)
+	}
+
+	tracerProvider = sdktrace.NewTracerProvider(opts...)
 
 	tracer = tracerProvider.Tracer("imgproxy")
 
@@ -268,16 +288,16 @@ func buildTLSConfig() (*tls.Config, error) {
 	}
 
 	certPool := x509.NewCertPool()
-	if !certPool.AppendCertsFromPEM([]byte(config.OpenTelemetryServerCert)) {
-		return nil, fmt.Errorf("Can't load OpenTelemetry server cert")
+	if !certPool.AppendCertsFromPEM(prepareKeyCert(config.OpenTelemetryServerCert)) {
+		return nil, errors.New("Can't load OpenTelemetry server cert")
 	}
 
 	tlsConf := tls.Config{RootCAs: certPool}
 
 	if len(config.OpenTelemetryClientCert) > 0 && len(config.OpenTelemetryClientKey) > 0 {
 		cert, err := tls.X509KeyPair(
-			[]byte(config.OpenTelemetryClientCert),
-			[]byte(config.OpenTelemetryClientKey),
+			prepareKeyCert(config.OpenTelemetryClientCert),
+			prepareKeyCert(config.OpenTelemetryClientKey),
 		)
 		if err != nil {
 			return nil, fmt.Errorf("Can't load OpenTelemetry client cert/key pair: %s", err)
@@ -287,6 +307,10 @@ func buildTLSConfig() (*tls.Config, error) {
 	}
 
 	return &tlsConf, nil
+}
+
+func prepareKeyCert(str string) []byte {
+	return []byte(strings.ReplaceAll(str, `\n`, "\n"))
 }
 
 func Stop() {

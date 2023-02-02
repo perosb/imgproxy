@@ -1,10 +1,51 @@
 # Changelog
 
 ## [Unreleased]
+### Change
+- Remove color-related EXIF data when stripping ICC profile.
+
+## [3.13.1] - 2023-01-16
+### Fix
+- Fix applying watermarks with replication.
+
+## [3.13.0] - 2023-01-11
+### Change
+- Add support for Managed Identity or Service Principal credentials to Azure Blob Storage integration.
+- Optimize memory usage in some scenarios.
+- Better SVG sanitization.
+- (pro) Allow usage of floating-point numbers in the `IMGPROXY_VIDEO_THUMBNAIL_SECOND` config and the `video_thumbnail_second` processing option.
+
+### Fix
+- Fix craches in some cases when using OpenTelemetry in Amazon ECS.
+- (pro) Fix saving of GIF with too small frame delay to MP4
+
+## [3.12.0] - 2022-12-11
+### Add
+- Add `IMGPROXY_MAX_ANIMATION_FRAME_RESOLUTION` config.
+- Add [Amazon CloudWatch](https://docs.imgproxy.net/latest/cloud_watch) support.
+- (pro) Add [`best` resultig image format](https://docs.imgproxy.net/latest/best_format).
+- (pro) Add `IMGPROXY_WEBP_COMPRESSION` config and [webp_options](https://docs.imgproxy.net/latest/generating_the_url?id=webp-options) processing option.
+
+### Change
+- Change `IMGPROXY_FORMAT_QUALITY` default value to `avif=65`.
+- Change `IMGPROXY_AVIF_SPEED` default value to `8`.
+- Change `IMGPROXY_PREFERRED_FORMATS` default value to `jpeg,png,gif`.
+- Set `Cache-Control: no-cache` header to the health check responses.
+- Allow replacing line breaks with `\n` in `IMGPROXY_OPEN_TELEMETRY_SERVER_CERT`, `IMGPROXY_OPEN_TELEMETRY_CLIENT_CERT`, and`IMGPROXY_OPEN_TELEMETRY_CLIENT_KEY`.
+
+### Fix
+- Fix 3GP video format detection.
+
+## [3.11.0] - 2022-11-17
 ### Add
 - Add `IMGPROXY_OPEN_TELEMETRY_GRPC_INSECURE` config.
-- Better XMP data stripping.
+- Add `IMGPROXY_OPEN_TELEMETRY_TRACE_ID_GENERATOR` config.
 - (pro) Add XMP data to the `/info` response.
+
+### Change
+- Better XMP data stripping.
+- Use parent-based OpenTelemetry sampler by default.
+- Use fixed TraceIdRatioBased sampler with OpenTelemetry.
 
 ## [3.10.0] - 2022-11-04
 ### Add
@@ -23,7 +64,7 @@
 - Add `IMGPROXY_SVG_FIX_UNSUPPORTED` config.
 
 ### Fix
-- Fix fix HTTP response status when OpenTelemetry support is enabled.
+- Fix HTTP response status when OpenTelemetry support is enabled.
 - (docker) Fix saving of paletted PNGs with low bit-depth.
 
 ## [3.8.0] - 2022-10-06
@@ -706,7 +747,7 @@ All-You-Ever-Wanted release! :tada:
 - [New advanced URL format](./docs/generating_the_url.md). Unleash the full power of imgproxy v2.0.
 - [Presets](./docs/presets.md). Shorten your urls by reusing processing options.
 - [Serving images from Amazon S3](./docs/serving_files_from_s3.md). Thanks to [@crohr](https://github.com/crohr), now we have a way to serve files from private S3 buckets.
-- [Autoconverting to WebP when supported by browser](./docs/configuration.md#webp-support-detection) (disabled by default). Use WebP as resulting format when browser supports it.
+- [Autoconverting to WebP when supported by browser](./docs/configuration.md#avifwebp-support-detection) (disabled by default). Use WebP as resulting format when browser supports it.
 - [Gaussian blur](./docs/generating_the_url.md#blur) and [sharpen](./docs/generating_the_url.md#sharpen) filters. Make your images look better than before.
 - [Focus point gravity](./docs/generating_the_url.md#gravity). Tell imgproxy what point will be the center of the image.
 - [Background color](./docs/generating_the_url.md#background). Control the color of background when converting PNG with alpha-channel to JPEG.

@@ -1,6 +1,7 @@
 package config
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"math"
@@ -35,11 +36,12 @@ var (
 
 	PathPrefix string
 
-	MaxSrcResolution   int
-	MaxSrcFileSize     int
-	MaxAnimationFrames int
-	MaxSvgCheckBytes   int
-	MaxRedirects       int
+	MaxSrcResolution            int
+	MaxSrcFileSize              int
+	MaxAnimationFrames          int
+	MaxAnimationFrameResolution int
+	MaxSvgCheckBytes            int
+	MaxRedirects                int
 
 	JpegProgressive       bool
 	PngInterlaced         bool
@@ -152,7 +154,12 @@ var (
 	OpenTelemetryClientKey         string
 	OpenTelemetryGRPCInsecure      bool
 	OpenTelemetryPropagators       []string
+	OpenTelemetryTraceIDGenerator  string
 	OpenTelemetryConnectionTimeout int
+
+	CloudWatchServiceName string
+	CloudWatchNamespace   string
+	CloudWatchRegion      string
 
 	BugsnagKey   string
 	BugsnagStage string
@@ -201,7 +208,7 @@ func Reset() {
 	KeepAliveTimeout = 10
 	ClientKeepAliveTimeout = 90
 	DownloadTimeout = 5
-	Concurrency = runtime.NumCPU() * 2
+	Concurrency = runtime.GOMAXPROCS(0) * 2
 	RequestsQueueSize = 0
 	MaxClients = 2048
 
@@ -216,6 +223,7 @@ func Reset() {
 	MaxSrcResolution = 16800000
 	MaxSrcFileSize = 0
 	MaxAnimationFrames = 1
+	MaxAnimationFrameResolution = 0
 	MaxSvgCheckBytes = 32 * 1024
 	MaxRedirects = 10
 
@@ -223,9 +231,9 @@ func Reset() {
 	PngInterlaced = false
 	PngQuantize = false
 	PngQuantizationColors = 256
-	AvifSpeed = 5
+	AvifSpeed = 8
 	Quality = 80
-	FormatQuality = map[imagetype.Type]int{imagetype.AVIF: 50}
+	FormatQuality = map[imagetype.Type]int{imagetype.AVIF: 65}
 	StripMetadata = true
 	KeepCopyright = true
 	StripColorProfile = true
@@ -244,9 +252,6 @@ func Reset() {
 		imagetype.JPEG,
 		imagetype.PNG,
 		imagetype.GIF,
-		imagetype.WEBP,
-		imagetype.AVIF,
-		imagetype.ICO,
 	}
 
 	SkipProcessingFormats = make([]imagetype.Type, 0)
@@ -331,7 +336,12 @@ func Reset() {
 	OpenTelemetryClientKey = ""
 	OpenTelemetryGRPCInsecure = true
 	OpenTelemetryPropagators = make([]string, 0)
+	OpenTelemetryTraceIDGenerator = "xray"
 	OpenTelemetryConnectionTimeout = 5
+
+	CloudWatchServiceName = ""
+	CloudWatchNamespace = "imgproxy"
+	CloudWatchRegion = ""
 
 	BugsnagKey = ""
 	BugsnagStage = "production"
@@ -387,6 +397,7 @@ func Configure() error {
 	configurators.Int(&MaxSvgCheckBytes, "IMGPROXY_MAX_SVG_CHECK_BYTES")
 
 	configurators.Int(&MaxAnimationFrames, "IMGPROXY_MAX_ANIMATION_FRAMES")
+	configurators.MegaInt(&MaxAnimationFrameResolution, "IMGPROXY_MAX_ANIMATION_FRAME_RESOLUTION")
 
 	configurators.Int(&MaxRedirects, "IMGPROXY_MAX_REDIRECTS")
 
@@ -522,7 +533,12 @@ func Configure() error {
 	configurators.String(&OpenTelemetryClientKey, "IMGPROXY_OPEN_TELEMETRY_CLIENT_KEY")
 	configurators.Bool(&OpenTelemetryGRPCInsecure, "IMGPROXY_OPEN_TELEMETRY_GRPC_INSECURE")
 	configurators.StringSlice(&OpenTelemetryPropagators, "IMGPROXY_OPEN_TELEMETRY_PROPAGATORS")
+	configurators.String(&OpenTelemetryTraceIDGenerator, "IMGPROXY_OPEN_TELEMETRY_TRACE_ID_GENERATOR")
 	configurators.Int(&OpenTelemetryConnectionTimeout, "IMGPROXY_OPEN_TELEMETRY_CONNECTION_TIMEOUT")
+
+	configurators.String(&CloudWatchServiceName, "IMGPROXY_CLOUD_WATCH_SERVICE_NAME")
+	configurators.String(&CloudWatchNamespace, "IMGPROXY_CLOUD_WATCH_NAMESPACE")
+	configurators.String(&CloudWatchRegion, "IMGPROXY_CLOUD_WATCH_REGION")
 
 	configurators.String(&BugsnagKey, "IMGPROXY_BUGSNAG_KEY")
 	configurators.String(&BugsnagStage, "IMGPROXY_BUGSNAG_STAGE")
@@ -556,7 +572,7 @@ func Configure() error {
 	}
 
 	if len(Bind) == 0 {
-		return fmt.Errorf("Bind address is not defined")
+		return errors.New("Bind address is not defined")
 	}
 
 	if ReadTimeout <= 0 {
@@ -624,7 +640,7 @@ func Configure() error {
 	}
 
 	if len(PreferredFormats) == 0 {
-		return fmt.Errorf("At least one preferred format should be specified")
+		return errors.New("At least one preferred format should be specified")
 	}
 
 	if IgnoreSslVerification {
@@ -639,7 +655,7 @@ func Configure() error {
 		}
 
 		if !stat.IsDir() {
-			return fmt.Errorf("Cannot use local directory: not a directory")
+			return errors.New("Cannot use local directory: not a directory")
 		}
 
 		if LocalFileSystemRoot == "/" {
@@ -653,35 +669,35 @@ func Configure() error {
 	}
 
 	if WatermarkOpacity <= 0 {
-		return fmt.Errorf("Watermark opacity should be greater than 0")
+		return errors.New("Watermark opacity should be greater than 0")
 	} else if WatermarkOpacity > 1 {
-		return fmt.Errorf("Watermark opacity should be less than or equal to 1")
+		return errors.New("Watermark opacity should be less than or equal to 1")
 	}
 
 	if FallbackImageHTTPCode < 100 || FallbackImageHTTPCode > 599 {
-		return fmt.Errorf("Fallback image HTTP code should be between 100 and 599")
+		return errors.New("Fallback image HTTP code should be between 100 and 599")
 	}
 
 	if len(PrometheusBind) > 0 && PrometheusBind == Bind {
-		return fmt.Errorf("Can't use the same binding for the main server and Prometheus")
+		return errors.New("Can't use the same binding for the main server and Prometheus")
 	}
 
 	if OpenTelemetryConnectionTimeout < 1 {
-		return fmt.Errorf("OpenTelemetry connection timeout should be greater than zero")
+		return errors.New("OpenTelemetry connection timeout should be greater than zero")
 	}
 
 	if FreeMemoryInterval <= 0 {
-		return fmt.Errorf("Free memory interval should be greater than zero")
+		return errors.New("Free memory interval should be greater than zero")
 	}
 
 	if DownloadBufferSize < 0 {
-		return fmt.Errorf("Download buffer size should be greater than or equal to 0")
+		return errors.New("Download buffer size should be greater than or equal to 0")
 	} else if DownloadBufferSize > math.MaxInt32 {
 		return fmt.Errorf("Download buffer size can't be greater than %d", math.MaxInt32)
 	}
 
 	if BufferPoolCalibrationThreshold < 64 {
-		return fmt.Errorf("Buffer pool calibration threshold should be greater than or equal to 64")
+		return errors.New("Buffer pool calibration threshold should be greater than or equal to 64")
 	}
 
 	return nil
