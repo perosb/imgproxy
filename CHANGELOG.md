@@ -1,8 +1,17 @@
 # Changelog
 
 ## [Unreleased]
+## Add
+- Add [extend_aspect_ratio](https://docs.imgproxy.net/latest/generating_the_url?id=extend-aspect-ratio) processing option.
+
+## [3.13.2] - 2023-02-15
 ### Change
 - Remove color-related EXIF data when stripping ICC profile.
+- (pro) Optimize saving to MP4.
+
+### Fix
+- (pro) Fix saving with autoquality in some cases.
+- (pro) Fix saving large images to MP4.
 
 ## [3.13.1] - 2023-01-16
 ### Fix
