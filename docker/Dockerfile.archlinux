@@ -33,7 +33,13 @@ pango \
 	doxygen \
 	git \
 	yasm \
-	aom
+	aom \
+libvips \
+openjpeg2
+#	libjxl \
+#	highway \
+#	openslide
+
 
 WORKDIR /tmp/
 
@@ -62,12 +68,13 @@ RUN \
 FROM base as libvips
 COPY --from=libheif /tmp/*.zst /tmp/
 RUN pacman -U /tmp/*.zst --noconfirm
-RUN \
-	curl -sLO https://raw.githubusercontent.com/archlinux/svntogit-community/packages/libvips/trunk/PKGBUILD && \
-	sed -i 's#\./configure#CFLAGS=\"-g -O3\" CXXFLAGS=\"-D_GLIBCXX_USE_CXX11_ABI=0 -g -O3\" ./configure --disable-debug --disable-dependency-tracking --disable-introspection --disable-static --disable-modules --enable-gtk-doc-html=no --enable-gtk-doc=no#' PKGBUILD && \
-	sed -i "s#'openexr'##" PKGBUILD && \
-        sed -i "s#'poppler-glib'##" PKGBUILD && \
-        sudo -u nobody makepkg --noconfirm
+
+#RUN \
+#	curl -sLO https://raw.githubusercontent.com/archlinux/svntogit-community/packages/libvips/trunk/PKGBUILD && \
+#	sed -i 's#\./configure#CFLAGS=\"-g -O3\" CXXFLAGS=\"-D_GLIBCXX_USE_CXX11_ABI=0 -g -O3\" ./configure --disable-debug --disable-dependency-tracking --disable-introspection --disable-static --disable-modules --enable-gtk-doc-html=no --enable-gtk-doc=no#' PKGBUILD && \
+#	sed -i "s#'openexr'##" PKGBUILD && \
+#       sed -i "s#'poppler-glib'##" PKGBUILD && \
+#        sudo -u nobody makepkg --noconfirm
 
 FROM base as imgproxy
 COPY --from=libvips /tmp/*.zst /tmp/
@@ -81,8 +88,8 @@ COPY . .
 ENV CGO_LDFLAGS_ALLOW='-Wl,--no-as-needed,-s,-w'
 ENV CFLAGS=-O3
 RUN go version; \
-	go mod tidy; \
-	go build \
+	go mod tidy;
+RUN go build \
 	-v \
 	-ldflags='-s -w' \
 	-o /usr/local/bin/imgproxy
@@ -97,7 +104,7 @@ COPY --from=imgproxy /usr/local/bin/imgproxy /usr/local/bin/imgproxy
 RUN	\
 	ls -al /tmp/*.zst && \
 	pacman -Sy --noconfirm && \
-#	pacman -S --noconfirm libvips && \
+	pacman -S --noconfirm libvips openjpeg2 openslide poppler-glib libjxl imagemagick && \
 	pacman -U /tmp/*.zst --noconfirm && \
 	yes | pacman -Scc && \
 	rm -rf  /tmp/*.zst /var/lib/pacman/sync/*.db /usr/include/
