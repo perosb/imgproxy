@@ -42,6 +42,7 @@ var (
 	MaxAnimationFrameResolution int
 	MaxSvgCheckBytes            int
 	MaxRedirects                int
+	AllowSecurityOptions        bool
 
 	JpegProgressive       bool
 	PngInterlaced         bool
@@ -84,7 +85,10 @@ var (
 	IgnoreSslVerification bool
 	DevelopmentErrorsMode bool
 
-	AllowedSources []*regexp.Regexp
+	AllowedSources                []*regexp.Regexp
+	AllowLoopbackSourceAddresses  bool
+	AllowLinkLocalSourceAddresses bool
+	AllowPrivateSourceAddresses   bool
 
 	SanitizeSvg bool
 
@@ -226,6 +230,7 @@ func Reset() {
 	MaxAnimationFrameResolution = 0
 	MaxSvgCheckBytes = 32 * 1024
 	MaxRedirects = 10
+	AllowSecurityOptions = false
 
 	JpegProgressive = false
 	PngInterlaced = false
@@ -273,6 +278,9 @@ func Reset() {
 	DevelopmentErrorsMode = false
 
 	AllowedSources = make([]*regexp.Regexp, 0)
+	AllowLoopbackSourceAddresses = false
+	AllowLinkLocalSourceAddresses = false
+	AllowPrivateSourceAddresses = true
 
 	SanitizeSvg = true
 
@@ -402,8 +410,13 @@ func Configure() error {
 	configurators.Int(&MaxRedirects, "IMGPROXY_MAX_REDIRECTS")
 
 	configurators.Patterns(&AllowedSources, "IMGPROXY_ALLOWED_SOURCES")
+	configurators.Bool(&AllowLoopbackSourceAddresses, "IMGPROXY_ALLOW_LOOPBACK_SOURCE_ADDRESSES")
+	configurators.Bool(&AllowLinkLocalSourceAddresses, "IMGPROXY_ALLOW_LINK_LOCAL_SOURCE_ADDRESSES")
+	configurators.Bool(&AllowPrivateSourceAddresses, "IMGPROXY_ALLOW_PRIVATE_SOURCE_ADDRESSES")
 
 	configurators.Bool(&SanitizeSvg, "IMGPROXY_SANITIZE_SVG")
+
+	configurators.Bool(&AllowSecurityOptions, "IMGPROXY_ALLOW_SECURITY_OPTIONS")
 
 	configurators.Bool(&JpegProgressive, "IMGPROXY_JPEG_PROGRESSIVE")
 	configurators.Bool(&PngInterlaced, "IMGPROXY_PNG_INTERLACED")

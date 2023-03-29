@@ -1,8 +1,24 @@
 # Changelog
 
 ## [Unreleased]
+### Add
+- Add the `IMGPROXY_ALLOW_LOOPBACK_SOURCE_ADDRESSES`, `IMGPROXY_ALLOW_LINK_LOCAL_SOURCE_ADDRESSES`, and `IMGPROXY_ALLOW_PRIVATE_SOURCE_ADDRESSES` configs.
+
+### Change
+- Connecting to loopback, link-local multicast, and link-local unicast IP addresses when requesting source images is prohibited by default.
+
+## [3.14.0] - 2023-03-07
 ## Add
 - Add [extend_aspect_ratio](https://docs.imgproxy.net/latest/generating_the_url?id=extend-aspect-ratio) processing option.
+- Add the `IMGPROXY_ALLOW_SECURITY_OPTIONS` config + `max_src_resolution`, `max_src_file_size`, `max_animation_frames`, and `max_animation_frame_resolution` processing options.
+- (pro) Add [advanced smart crop](https://docs.imgproxy.net/latest/configuration?id=smart-crop).
+
+### Change
+- Make the `expires` processing option set `Expires` and `Cache-Control` headers.
+- Sanitize `use` tags in SVGs.
+
+### Fix
+- Fix handling some ICC profiles.
 
 ## [3.13.2] - 2023-02-15
 ### Change
