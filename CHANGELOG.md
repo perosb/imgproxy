@@ -1,11 +1,18 @@
 # Changelog
 
 ## [Unreleased]
+
+## [3.15.0] - 2023-04-10
 ### Add
 - Add the `IMGPROXY_ALLOW_LOOPBACK_SOURCE_ADDRESSES`, `IMGPROXY_ALLOW_LINK_LOCAL_SOURCE_ADDRESSES`, and `IMGPROXY_ALLOW_PRIVATE_SOURCE_ADDRESSES` configs.
 
 ### Change
 - Connecting to loopback, link-local multicast, and link-local unicast IP addresses when requesting source images is prohibited by default.
+- Tuned source image downloading flow.
+- Disable extension checking if the `raw` processing option is used.
+
+### Fix
+- (pro) Fix face detection during advanced smart crop in some cases.
 
 ## [3.14.0] - 2023-03-07
 ## Add
