@@ -3,19 +3,18 @@ package imagedata
 import (
 	"compress/gzip"
 	"context"
-	"crypto/tls"
 	"fmt"
 	"io"
-	"net"
 	"net/http"
 	"net/http/cookiejar"
-	"syscall"
+	"strings"
 	"time"
 
 	"github.com/imgproxy/imgproxy/v3/config"
 	"github.com/imgproxy/imgproxy/v3/ierrors"
 	"github.com/imgproxy/imgproxy/v3/security"
 
+	defaultTransport "github.com/imgproxy/imgproxy/v3/transport"
 	azureTransport "github.com/imgproxy/imgproxy/v3/transport/azure"
 	fsTransport "github.com/imgproxy/imgproxy/v3/transport/fs"
 	gcsTransport "github.com/imgproxy/imgproxy/v3/transport/gcs"
@@ -35,6 +34,7 @@ var (
 		"Cache-Control",
 		"Expires",
 		"ETag",
+		"Last-Modified",
 	}
 
 	// For tests
@@ -58,32 +58,9 @@ func (e *ErrorNotModified) Error() string {
 }
 
 func initDownloading() error {
-	transport := &http.Transport{
-		Proxy: http.ProxyFromEnvironment,
-		DialContext: (&net.Dialer{
-			Timeout:   30 * time.Second,
-			KeepAlive: 30 * time.Second,
-			DualStack: true,
-			Control: func(network, address string, c syscall.RawConn) error {
-				return security.VerifySourceNetwork(address)
-			},
-		}).DialContext,
-		MaxIdleConns:          100,
-		MaxIdleConnsPerHost:   config.Concurrency + 1,
-		IdleConnTimeout:       time.Duration(config.ClientKeepAliveTimeout) * time.Second,
-		TLSHandshakeTimeout:   10 * time.Second,
-		ExpectContinueTimeout: 1 * time.Second,
-		ForceAttemptHTTP2:     true,
-		DisableCompression:    true,
-	}
-
-	if config.ClientKeepAliveTimeout <= 0 {
-		transport.MaxIdleConnsPerHost = -1
-		transport.DisableKeepAlives = true
-	}
-
-	if config.IgnoreSslVerification {
-		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true}
+	transport, err := defaultTransport.New(true)
+	if err != nil {
+		return err
 	}
 
 	registerProtocol := func(scheme string, rt http.RoundTripper) {
@@ -189,12 +166,27 @@ func BuildImageRequest(ctx context.Context, imageURL string, header http.Header,
 }
 
 func SendRequest(req *http.Request) (*http.Response, error) {
-	res, err := downloadClient.Do(req)
-	if err != nil {
+	for {
+		res, err := downloadClient.Do(req)
+		if err == nil {
+			return res, nil
+		}
+
+		if res != nil && res.Body != nil {
+			res.Body.Close()
+		}
+
+		if strings.Contains(err.Error(), "client connection lost") {
+			select {
+			case <-req.Context().Done():
+				return nil, err
+			case <-time.After(100 * time.Microsecond):
+				continue
+			}
+		}
+
 		return nil, wrapError(err)
 	}
-
-	return res, nil
 }
 
 func requestImage(ctx context.Context, imageURL string, opts DownloadOptions) (*http.Response, context.CancelFunc, error) {

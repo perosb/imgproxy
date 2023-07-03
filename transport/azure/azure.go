@@ -16,7 +16,6 @@ import (
 	"github.com/Azure/azure-sdk-for-go/sdk/storage/azblob/blockblob"
 
 	"github.com/imgproxy/imgproxy/v3/config"
-	"github.com/imgproxy/imgproxy/v3/ctxreader"
 	"github.com/imgproxy/imgproxy/v3/httprange"
 	"github.com/imgproxy/imgproxy/v3/transport/notmodified"
 )
@@ -124,6 +123,10 @@ func (t transport) RoundTrip(req *http.Request) (*http.Response, error) {
 		etag := string(*result.ETag)
 		header.Set("ETag", etag)
 	}
+	if config.LastModifiedEnabled && result.LastModified != nil {
+		lastModified := result.LastModified.Format(http.TimeFormat)
+		header.Set("Last-Modified", lastModified)
+	}
 
 	if resp := notmodified.Response(req, header); resp != nil {
 		if result.Body != nil {
@@ -159,7 +162,7 @@ func (t transport) RoundTrip(req *http.Request) (*http.Response, error) {
 		ProtoMinor:    0,
 		Header:        header,
 		ContentLength: contentLength,
-		Body:          ctxreader.New(req.Context(), result.Body, true),
+		Body:          result.Body,
 		Close:         true,
 		Request:       req,
 	}, nil

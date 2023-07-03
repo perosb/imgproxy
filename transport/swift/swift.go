@@ -12,7 +12,7 @@ import (
 	"github.com/ncw/swift/v2"
 
 	"github.com/imgproxy/imgproxy/v3/config"
-	"github.com/imgproxy/imgproxy/v3/ctxreader"
+	defaultTransport "github.com/imgproxy/imgproxy/v3/transport"
 	"github.com/imgproxy/imgproxy/v3/transport/notmodified"
 )
 
@@ -21,6 +21,11 @@ type transport struct {
 }
 
 func New() (http.RoundTripper, error) {
+	trans, err := defaultTransport.New(false)
+	if err != nil {
+		return nil, err
+	}
+
 	c := &swift.Connection{
 		UserName:       config.SwiftUsername,
 		ApiKey:         config.SwiftAPIKey,
@@ -30,11 +35,12 @@ func New() (http.RoundTripper, error) {
 		Tenant:         config.SwiftTenant, // v2 auth only
 		Timeout:        time.Duration(config.SwiftTimeoutSeconds) * time.Second,
 		ConnectTimeout: time.Duration(config.SwiftConnectTimeoutSeconds) * time.Second,
+		Transport:      trans,
 	}
 
 	ctx := context.Background()
 
-	err := c.Authenticate(ctx)
+	err = c.Authenticate(ctx)
 
 	if err != nil {
 		return nil, fmt.Errorf("swift authentication error: %s", err)
@@ -78,11 +84,17 @@ func (t transport) RoundTrip(req *http.Request) (resp *http.Response, err error)
 		if etag, ok := objectHeaders["Etag"]; ok {
 			header.Set("ETag", etag)
 		}
+	}
 
-		if resp := notmodified.Response(req, header); resp != nil {
-			object.Close()
-			return resp, nil
+	if config.LastModifiedEnabled {
+		if lastModified, ok := objectHeaders["Last-Modified"]; ok {
+			header.Set("Last-Modified", lastModified)
 		}
+	}
+
+	if resp := notmodified.Response(req, header); resp != nil {
+		object.Close()
+		return resp, nil
 	}
 
 	for k, v := range objectHeaders {
@@ -96,7 +108,7 @@ func (t transport) RoundTrip(req *http.Request) (resp *http.Response, err error)
 		ProtoMajor: 1,
 		ProtoMinor: 0,
 		Header:     header,
-		Body:       ctxreader.New(req.Context(), object, true),
+		Body:       object,
 		Close:      true,
 		Request:    req,
 	}, nil
