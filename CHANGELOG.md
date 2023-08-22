@@ -1,10 +1,32 @@
 # Changelog
 
 ## [Unreleased]
+
+## [3.19.0] - 2023-08-21
+### Add
+- Add `IMGPROXY_WORKERS` alias for the `IMGPROXY_CONCURRENCY` config.
+- Add [multi-region mode](https://docs.imgproxy.net/latest/serving_files_from_s3?id=multi-region-mode) to S3 integration.
+- Add the ability to [load environment variables](https://docs.imgproxy.net/latest/loading_environment_variables) from a file or a cloud secret.
+- (pro) Add [pages](https://docs.imgproxy.net/latest/generating_the_url?id=pages) processing option.
+
+### Change
+- Don't report `The image request is cancelled` errors.
+- Create and destroy a tiny image during health check to check that vips is operational.
+- (pro) Change the `/info` endpoint behavior to return only the first EXIF/XMP/IPTC block data of JPEG if the image contains multiple metadata blocks of the same type.
+
+### Fix
+- Fix reporting image loading errors.
+- Fix the `Cache-Control` and `Expires` headers behavior when both `IMGPROXY_CACHE_CONTROL_PASSTHROUGH` and `IMGPROXY_FALLBACK_IMAGE_TTL` configs are set.
+- (pro) Fix the `IMGPROXY_FALLBACK_IMAGE_TTL` config behavior when the `fallback_image_url` processing option is used.
+
+## [3.18.2] - 2023-07-13
 ### Fix
 - Fix saving to JPEG when using linear colorspace.
+- Fix the `Cache-Control` and `Expires` headers passthrough when SVG is sanitized or fixed.
+- (pro) Fix complexity calculation for still images.
+- (docker) Fix crashes during some resizing cases.
 
-## [3.18.1] - 2023-07-29
+## [3.18.1] - 2023-06-29
 ### Change
 - Change maximum and default values of `IMGPROXY_AVIF_SPEED` to `9`.
 - (pro) Fix detection of some videos.

@@ -13,6 +13,7 @@ const linksMenu = '<div class="links-menu">' +
   '<a href="https://github.com/imgproxy" target="_blank" title="GitHub"><img src="/assets/github.svg" /></a>' +
   '<a href="https://twitter.com/imgproxy_net" target="_blank" title="Twitter"><img src="/assets/twitter.svg" /></a>' +
   '<a href="https://discord.gg/5GgpXgtC9u" target="_blank" title="Discord"><img src="/assets/discord.svg" /></a>' +
+  '<a href="https://github.com/sponsors/imgproxy" target="_blank" title="Sponsor"><img src="/assets/heart.svg" /></a>' +
   '</div>';
 
 const docEditBase = 'https://github.com/imgproxy/imgproxy/edit/master/docs/';
@@ -26,6 +27,10 @@ const proLink = `<a class="badge" href="https://imgproxy.net/#pro" target="_blan
 
 const oldProBadge = "<i class='badge badge-pro'></i>";
 
+const configRegex = /^\* `([^`]+)`:/gm;
+
+const copyCodeBtn = '<button class="copy-code" title="Copy code"></button>';
+
 const defaultVersions = [["latest", "latest"]];
 
 const configureDocsify = (additionalVersions, latestVersion, latestTag) => {
@@ -33,7 +38,7 @@ const configureDocsify = (additionalVersions, latestVersion, latestTag) => {
 
   const versionAliases = {};
 
-  const versionSelect = ['<select id="version-selector" name="version" class="sidebar-version-select">'];
+  const versionSelect = ['<div class="sidebar-version-select"><select id="version-selector" name="version">'];
   versions.forEach(([version, tag]) => {
     const value = version == latestVersion ? "" : version;
     versionSelect.push(`<option value="${value}">${version}</value>`);
@@ -45,7 +50,7 @@ const configureDocsify = (additionalVersions, latestVersion, latestTag) => {
         `https://raw.githubusercontent.com/imgproxy/imgproxy/${tag}/docs/README.md`;
     }
   });
-  versionSelect.push('</select>');
+  versionSelect.push('</select></div>');
 
   if (latestTag === "latest") latestTag = "master";
 
@@ -122,8 +127,19 @@ const configureDocsify = (additionalVersions, latestVersion, latestTag) => {
         })
 
         hook.beforeEach((content, next) => {
-          content = content.replaceAll(proBadgeRegex, proLink);
-          content = content.replaceAll(oldProBadge, proLink);
+          content = content
+            .replaceAll(proBadgeRegex, proLink)
+            .replaceAll(oldProBadge, proLink);
+
+          content = content
+            .replaceAll("📝", '<i class="icon icon-note"></i>')
+            .replaceAll("⚠️", '<i class="icon icon-warn"></i>')
+            .replaceAll("✅", '<i class="icon icon-check"></i>')
+            .replaceAll("❌", '<i class="icon icon-cross"></i>');
+
+          if (vm.route.path.endsWith('/configuration'))
+            content = content.replaceAll(configRegex, '* <code id="$1">$1</code>:');
+
           next(content);
         })
 
@@ -134,6 +150,36 @@ const configureDocsify = (additionalVersions, latestVersion, latestTag) => {
           // Docsify cuts off "target" sometimes
           const links = Docsify.dom.findAll("a.badge");
           links.forEach(l => { l.setAttribute("target", "_blank") });
+
+          const codeBlocks = Docsify.dom.findAll('pre[data-lang]');
+          codeBlocks.forEach(elm =>
+            elm.insertAdjacentHTML('beforeend', copyCodeBtn));
+        })
+
+        hook.mounted(() => {
+          const content = Docsify.dom.find('.content');
+
+          content.addEventListener('click', function(e) {
+            if (!e.target.classList.contains('copy-code'))
+              return;
+
+            const btn = e.target;
+            const code = Docsify.dom.find(btn.parentNode, 'code');
+
+            navigator.clipboard.writeText(code.innerText).then(() => {
+              btn.classList.add('copy-code-success');
+              setTimeout(() => {
+                btn.classList.remove('copy-code-success');
+              }, 1500);
+            }).catch((err)  =>{
+              console.log(`Can't copy code: ${err}`);
+
+              btn.classList.add('copy-code-error');
+              setTimeout(() => {
+                btn.classList.remove('copy-code-error');
+              }, 1500);
+            });
+          });
         })
       }
     ])

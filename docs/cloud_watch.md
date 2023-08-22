@@ -1,6 +1,6 @@
 # Amazon CloudWatch
 
-imgproxy can send its metrics to AmazonCloudFront. To use this feature, do the following:
+imgproxy can send its metrics to Amazon CloudWatch. To use this feature, do the following:
 
 1. Set the `IMGPROXY_CLOUD_WATCH_SERVICE_NAME` environment variable. imgproxy will use the value of this variable as a value for the `ServiceName` dimension.
 2. [Set up the necessary credentials](#set-up-credentials) to grant access to CloudWatch.
@@ -11,7 +11,7 @@ imgproxy sends the following metrics to CloudWatch:
 
 * `RequestsInProgress`: the number of requests currently in progress
 * `ImagesInProgress`: the number of images currently in progress
-* `ConcurrencyUtilization`: the percentage of imgproxy's concurrency utilization. Calculated as `RequestsInProgress / IMGPROXY_CONCURRENCY * 100`
+* `WorkersUtilization`, `ConcurrencyUtilization`: the percentage of imgproxy's workers utilization. Calculated as `RequestsInProgress / IMGPROXY_WORKERS * 100`
 * `BufferSize`: a summary of the download buffers sizes (in bytes)
 * `BufferDefaultSize`: calibrated default buffer size (in bytes)
 * `BufferMaxSize`: calibrated maximum buffer size (in bytes)
@@ -41,8 +41,6 @@ AWS_ACCESS_KEY_ID=my_access_key AWS_SECRET_ACCESS_KEY=my_secret_key imgproxy
 # same for Docker
 docker run -e AWS_ACCESS_KEY_ID=my_access_key -e AWS_SECRET_ACCESS_KEY=my_secret_key -it darthsim/imgproxy
 ```
-
-This is the recommended method when using dockerized imgproxy.
 
 #### Shared credentials file
 

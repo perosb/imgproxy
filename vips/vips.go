@@ -7,12 +7,14 @@ package vips
 */
 import "C"
 import (
+	"context"
 	"errors"
 	"math"
 	"os"
 	"runtime"
 	"strings"
 	"sync"
+	"time"
 	"unsafe"
 
 	log "github.com/sirupsen/logrus"
@@ -147,6 +149,35 @@ func GetAllocs() float64 {
 	return float64(C.vips_tracked_get_allocs())
 }
 
+func Health() error {
+	timer := time.NewTimer(5 * time.Second)
+	defer timer.Stop()
+
+	done := make(chan struct{})
+
+	var err error
+
+	go func(done chan struct{}) {
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
+
+		defer Cleanup()
+
+		if C.vips_health() != 0 {
+			err = Error()
+		}
+
+		close(done)
+	}(done)
+
+	select {
+	case <-done:
+		return err
+	case <-timer.C:
+		return context.DeadlineExceeded
+	}
+}
+
 func Cleanup() {
 	C.vips_cleanup()
 }
@@ -155,12 +186,14 @@ func Error() error {
 	defer C.vips_error_clear()
 
 	errstr := strings.TrimSpace(C.GoString(C.vips_error_buffer()))
+	err := ierrors.NewUnexpected(errstr, 1)
 
 	if strings.Contains(errstr, "load_buffer: ") {
-		return ierrors.New(422, errstr, "Broken or unsupported image")
+		err.StatusCode = 422
+		err.PublicMessage = "Broken or unsupported image"
 	}
 
-	return ierrors.NewUnexpected(errstr, 1)
+	return err
 }
 
 func hasOperation(name string) bool {

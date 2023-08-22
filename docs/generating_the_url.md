@@ -683,9 +683,24 @@ page:%page
 pg:%page
 ```
 
-When a source image supports pagination (PDF, TIFF) or animation (GIF, WebP), this option allows specifying the page to use it on. Page numeration starts from zero.
+When a source image supports pagination (PDF, TIFF) or animation (GIF, WebP), this option allows specifying the page to use. Page numeration starts from zero.
+
+**📝 Note:** If both the source and the resulting image formats supoprt animation, imgproxy will ignore this option and use all the source image pages. Use the [disable_animation](#disable-animation) option to make imgproxy treat all images as not animated.
 
 Default: 0
+
+### Pages![pro](./assets/pro.svg) :id=pages
+
+```
+pages:%pages
+pgs:%pages
+```
+
+When a source image supports pagination (PDF, TIFF) or animation (GIF, WebP), this option allows specifying the number of pages to use. The pages will be stacked vertically and left-aligned.
+
+**📝 Note:** If both the source and the resulting image formats supoprt animation, imgproxy will ignore this option and use all the source image pages. Use the [disable_animation](#disable-animation) option to make imgproxy treat all images as not animated.
+
+Default: 1
 
 ### Disable animation![pro](./assets/pro.svg) :id=disable-animation
 
@@ -694,7 +709,7 @@ disable_animation:%disable
 da:%disable
 ```
 
-When set to `1`, `t` or `true`, imgproxy will use a single frame of animated images. Use the [page](#page) option to specify which frame imgproxy should use.
+When set to `1`, `t` or `true`, imgproxy will treat all images as not animated. Use the [page](#page) and the [pages](#pages) options to specify which frames imgproxy should use.
 
 Default: `false`
 
@@ -746,7 +761,7 @@ When set to `1`, `t` or `true`, imgproxy will respond with a raw unprocessed, an
 * While the `skip_processing` option has some conditions to skip the processing, the `raw` option allows to skip processing no matter what
 * With the `raw` option set, imgproxy doesn't check the source image's type, resolution, and file size. Basically, the `raw` option allows streaming of any file type
 * With the `raw` option set, imgproxy won't download the whole image to the memory. Instead, it will stream the source image directly to the response lowering memory usage
-* The requests with the `raw` option set are not limited by the `IMGPROXY_CONCURRENCY` config
+* The requests with the `raw` option set are not limited by the `IMGPROXY_WORKERS` config
 
 Default: `false`
 
