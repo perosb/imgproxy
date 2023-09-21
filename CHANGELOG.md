@@ -1,6 +1,19 @@
 # Changelog
 
 ## [Unreleased]
+### Add
+- Add video streams info to the `/info` response.
+
+### Change
+- Limit vector image sizes to `IMGPROXY_MAX_SRC_RESOLUTION`.
+
+### Fix
+- Fix parsing of HEIF files with large boxes.
+- Fix wrong colors when the source image has a linear colorspace.
+- Fix wrong colors or opacity when the source image is a TIFF with a float sample format.
+- Fix crashes during processing of large animated WebPs.
+- (pro) Fix generating thumbnails for WebM videos with transparency.
+- (pro) Fix style injection into some SVGs.
 
 ## [3.19.0] - 2023-08-21
 ### Add

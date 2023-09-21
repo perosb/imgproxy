@@ -11,6 +11,7 @@ import (
 	"errors"
 	"math"
 	"os"
+	"regexp"
 	"runtime"
 	"strings"
 	"sync"
@@ -47,6 +48,13 @@ var vipsConf struct {
 	PngQuantize           C.int
 	PngQuantizationColors C.int
 	AvifSpeed             C.int
+}
+
+var badImageErrRe = []*regexp.Regexp{
+	regexp.MustCompile(`^(\S+)load_buffer: `),
+	regexp.MustCompile(`^VipsJpeg: `),
+	regexp.MustCompile(`^tiff2vips: `),
+	regexp.MustCompile(`^webp2vips: `),
 }
 
 func Init() error {
@@ -188,9 +196,12 @@ func Error() error {
 	errstr := strings.TrimSpace(C.GoString(C.vips_error_buffer()))
 	err := ierrors.NewUnexpected(errstr, 1)
 
-	if strings.Contains(errstr, "load_buffer: ") {
-		err.StatusCode = 422
-		err.PublicMessage = "Broken or unsupported image"
+	for _, re := range badImageErrRe {
+		if re.MatchString(errstr) {
+			err.StatusCode = 422
+			err.PublicMessage = "Broken or unsupported image"
+			break
+		}
 	}
 
 	return err
@@ -322,6 +333,14 @@ func (img *Image) Load(imgdata *imagedata.ImageData, shrink int, scale float64, 
 
 	C.swap_and_clear(&img.VipsImage, tmp)
 
+	if imgdata.Type == imagetype.TIFF {
+		if C.vips_fix_float_tiff(img.VipsImage, &tmp) == 0 {
+			C.swap_and_clear(&img.VipsImage, tmp)
+		} else {
+			log.Warnf("Can't fix TIFF: %s", Error())
+		}
+	}
+
 	return nil
 }
 
@@ -396,6 +415,17 @@ func (img *Image) Clear() {
 	if img.VipsImage != nil {
 		C.clear_image(&img.VipsImage)
 	}
+}
+
+func (img *Image) LineCache(lines int) error {
+	var tmp *C.VipsImage
+
+	if C.vips_linecache_seq(img.VipsImage, &tmp, C.int(lines)) != 0 {
+		return Error()
+	}
+
+	C.swap_and_clear(&img.VipsImage, tmp)
+	return nil
 }
 
 func (img *Image) Arrayjoin(in []*Image) error {
