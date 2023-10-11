@@ -1,17 +1,27 @@
 # Changelog
 
 ## [Unreleased]
+
+## [3.20.0] - 2023-10-09
 ### Add
-- Add video streams info to the `/info` response.
+- (pro) Add [info options](https://docs.imgproxy.net/latest/getting_the_image_info?id=info-options) support to the `/info` endpoint.
+- (pro) Add video streams info to the `/info` endpoint response.
+- (docker) Add support for TIFFs with 16-bit float samples.
+- (docker) Add support for TIFFs with the old-style JPEG compression.
 
 ### Change
 - Limit vector image sizes to `IMGPROXY_MAX_SRC_RESOLUTION`.
+- (pro) Respect image orientation when extracting image dimensions for the `/info` endpoint response.
+- (pro) Respect `IMGPROXY_WORKERS` and `IMGPROXY_REQUESTS_QUEUE_SIZE` configs in the `/info` endpoint.
+- (pro) Collect detailed metrics for the `/info` endpoint.
+- (docker) Invalid UTF-8 strings in image metadata are fixed instead of being ignored.
 
 ### Fix
 - Fix parsing of HEIF files with large boxes.
 - Fix wrong colors when the source image has a linear colorspace.
 - Fix wrong colors or opacity when the source image is a TIFF with a float sample format.
 - Fix crashes during processing of large animated WebPs.
+- Fix `vips_allocs` OTel metric unit (was `By`, fixed to `1`).
 - (pro) Fix generating thumbnails for WebM videos with transparency.
 - (pro) Fix style injection into some SVGs.
 
