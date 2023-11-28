@@ -32,7 +32,7 @@ void vips_strip_meta(VipsImage *image);
 
 VipsBandFormat vips_band_format(VipsImage *in);
 
-void vips_remove_bits_per_sample(VipsImage *image);
+void vips_remove_palette_bit_depth(VipsImage *image);
 
 gboolean vips_is_animated(VipsImage *in);
 
@@ -87,6 +87,7 @@ int vips_pngsave_go(VipsImage *in, void **buf, size_t *len, int interlace, int q
     int colors);
 int vips_webpsave_go(VipsImage *in, void **buf, size_t *len, int quality);
 int vips_gifsave_go(VipsImage *in, void **buf, size_t *len);
+int vips_heifsave_go(VipsImage *in, void **buf, size_t *len, int quality);
 int vips_avifsave_go(VipsImage *in, void **buf, size_t *len, int quality, int speed);
 int vips_tiffsave_go(VipsImage *in, void **buf, size_t *len, int quality);
 

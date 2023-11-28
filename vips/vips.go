@@ -73,8 +73,6 @@ func Init() error {
 
 	C.vips_concurrency_set(1)
 
-	C.vips_vector_set_enabled(1)
-
 	if len(os.Getenv("IMGPROXY_VIPS_LEAK_CHECK")) > 0 {
 		C.vips_leak_set(C.gboolean(1))
 	}
@@ -258,7 +256,7 @@ func SupportsSave(it imagetype.Type) bool {
 		sup = hasOperation("webpsave_buffer")
 	case imagetype.GIF:
 		sup = hasOperation("gifsave_buffer")
-	case imagetype.AVIF:
+	case imagetype.HEIC, imagetype.AVIF:
 		sup = hasOperation("heifsave_buffer")
 	case imagetype.BMP:
 		sup = true
@@ -389,6 +387,8 @@ func (img *Image) Save(imgtype imagetype.Type, quality int) (*imagedata.ImageDat
 		err = C.vips_webpsave_go(img.VipsImage, &ptr, &imgsize, C.int(quality))
 	case imagetype.GIF:
 		err = C.vips_gifsave_go(img.VipsImage, &ptr, &imgsize)
+	case imagetype.HEIC:
+		err = C.vips_heifsave_go(img.VipsImage, &ptr, &imgsize, C.int(quality))
 	case imagetype.AVIF:
 		err = C.vips_avifsave_go(img.VipsImage, &ptr, &imgsize, C.int(quality), vipsConf.AvifSpeed)
 	case imagetype.TIFF:
@@ -553,8 +553,8 @@ func (img *Image) SetBlob(name string, value []byte) {
 	C.vips_image_set_blob_copy(img.VipsImage, cachedCString(name), unsafe.Pointer(&value[0]), C.size_t(len(value)))
 }
 
-func (img *Image) RemoveBitsPerSampleHeader() {
-	C.vips_remove_bits_per_sample(img.VipsImage)
+func (img *Image) RemovePaletteBitDepth() {
+	C.vips_remove_palette_bit_depth(img.VipsImage)
 }
 
 func (img *Image) CastUchar() error {

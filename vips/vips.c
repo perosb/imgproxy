@@ -1,26 +1,10 @@
 #include "vips.h"
 #include <string.h>
 
-#define VIPS_SUPPORT_AVIF_SPEED \
-  (VIPS_MAJOR_VERSION > 8 || \
-      (VIPS_MAJOR_VERSION == 8 && VIPS_MINOR_VERSION > 10) || \
-      (VIPS_MAJOR_VERSION == 8 && VIPS_MINOR_VERSION >= 10 && VIPS_MICRO_VERSION >= 2))
-
-#define VIPS_SUPPORT_AVIF_EFFORT \
-  (VIPS_MAJOR_VERSION > 8 || (VIPS_MAJOR_VERSION == 8 && VIPS_MINOR_VERSION >= 12))
-
-#define VIPS_SUPPORT_GIFSAVE \
-  (VIPS_MAJOR_VERSION > 8 || (VIPS_MAJOR_VERSION == 8 && VIPS_MINOR_VERSION >= 12))
-
-#define VIPS_GIF_RESOLUTION_LIMITED \
-  (VIPS_MAJOR_VERSION == 8 && VIPS_MINOR_VERSION <= 12)
-
 #define VIPS_SCRGB_ALPHA_FIXED \
   (VIPS_MAJOR_VERSION > 8 || (VIPS_MAJOR_VERSION == 8 && VIPS_MINOR_VERSION >= 15))
 
-#ifndef VIPS_META_BITS_PER_SAMPLE
-#define VIPS_META_BITS_PER_SAMPLE "palette-bit-depth"
-#endif
+#define VIPS_META_PALETTE_BITS_DEPTH "palette-bit-depth"
 
 int
 vips_initialize()
@@ -51,12 +35,7 @@ swap_and_clear(VipsImage **in, VipsImage *out)
 int
 gif_resolution_limit()
 {
-#if VIPS_GIF_RESOLUTION_LIMITED
-  // https://github.com/libvips/libvips/blob/v8.12.2/libvips/foreign/cgifsave.c#L437-L442
-  return 2000 * 2000;
-#else
   return INT_MAX / 4;
-#endif
 }
 
 // Just create and destroy a tiny image to ensure vips is operational
@@ -155,16 +134,16 @@ vips_black_go(VipsImage **out, int width, int height, int bands)
   return res;
 }
 
-/* Vips loads linear alpha in the 0.0-1.0 range but uses the 0.0-255.0 range.
- * https://github.com/libvips/libvips/pull/3627 fixes this behavior
- */
 int
 vips_fix_scRGB_alpha_tiff(VipsImage *in, VipsImage **out)
 {
 #if VIPS_SCRGB_ALPHA_FIXED
-#warning Revise vips_fix_scRGB_tiff
+  /* Vips 8.15+ uses 0.0-1.0 range for linear alpha, so we don't need a fix.
+   */
   return vips_copy(in, out, NULL);
 #else
+  /* Vips prior to 8.14 loads linear alpha in the 0.0-1.0 range but uses the 0.0-255.0 range.
+   */
   VipsImage *base = vips_image_new();
   VipsImage **t = (VipsImage **) vips_object_local_array(VIPS_OBJECT(base), 4);
 
@@ -273,22 +252,41 @@ vips_get_orientation(VipsImage *image)
 }
 
 int
-vips_get_bits_per_sample(VipsImage *image)
+vips_get_palette_bit_depth(VipsImage *image)
 {
-  int bits_per_sample;
+  int palette, palette_bit_depth;
 
-  if (
-      vips_image_get_typeof(image, VIPS_META_BITS_PER_SAMPLE) == G_TYPE_INT &&
-      vips_image_get_int(image, VIPS_META_BITS_PER_SAMPLE, &bits_per_sample) == 0)
-    return bits_per_sample;
+#ifdef VIPS_META_PALETTE
+  if (vips_image_get_typeof(image, VIPS_META_PALETTE) == G_TYPE_INT &&
+      vips_image_get_int(image, VIPS_META_PALETTE, &palette) == 0 &&
+      palette) {
+
+    if (vips_image_get_typeof(image, VIPS_META_BITS_PER_SAMPLE) == G_TYPE_INT &&
+        vips_image_get_int(image, VIPS_META_BITS_PER_SAMPLE, &palette_bit_depth) == 0)
+      return palette_bit_depth;
+
+    else
+      /* Image has palette but VIPS_META_BITS_PER_SAMPLE is not set.
+       * It's very unlikely but we should handle this
+       */
+      return 8;
+  }
+#else
+  if (vips_image_get_typeof(image, VIPS_META_PALETTE_BITS_DEPTH) == G_TYPE_INT &&
+      vips_image_get_int(image, VIPS_META_PALETTE_BITS_DEPTH, &palette_bit_depth) == 0)
+    return palette_bit_depth;
+#endif
 
   return 0;
 }
 
 void
-vips_remove_bits_per_sample(VipsImage *image)
+vips_remove_palette_bit_depth(VipsImage *image)
 {
-  vips_image_remove(image, VIPS_META_BITS_PER_SAMPLE);
+  vips_image_remove(image, VIPS_META_PALETTE_BITS_DEPTH);
+#ifdef VIPS_META_PALETTE
+  vips_image_remove(image, VIPS_META_PALETTE);
+#endif
 }
 
 VipsBandFormat
@@ -690,7 +688,7 @@ vips_embed_go(VipsImage *in, VipsImage **out, int x, int y, int width, int heigh
   VipsImage *tmp = NULL;
 
   if (!vips_image_hasalpha(in)) {
-    if (vips_bandjoin_const1(in, &tmp, 255, NULL))
+    if (vips_addalpha(in, &tmp, NULL))
       return 1;
 
     in = tmp;
@@ -712,7 +710,7 @@ vips_apply_watermark(VipsImage *in, VipsImage *watermark, VipsImage **out, int l
   VipsImage **t = (VipsImage **) vips_object_local_array(VIPS_OBJECT(base), 7);
 
   if (!vips_image_hasalpha(watermark)) {
-    if (vips_bandjoin_const1(watermark, &t[0], 255, NULL))
+    if (vips_addalpha(watermark, &t[0], NULL))
       return 1;
 
     watermark = t[0];
@@ -789,7 +787,10 @@ vips_strip(VipsImage *in, VipsImage **out, int keep_exif_copyright)
 
     if (
         (strcmp(name, VIPS_META_ICC_NAME) == 0) ||
+#ifdef VIPS_META_BITS_PER_SAMPLE
         (strcmp(name, VIPS_META_BITS_PER_SAMPLE) == 0) ||
+#endif
+        (strcmp(name, VIPS_META_PALETTE_BITS_DEPTH) == 0) ||
         (strcmp(name, "width") == 0) ||
         (strcmp(name, "height") == 0) ||
         (strcmp(name, "bands") == 0) ||
@@ -848,7 +849,7 @@ vips_pngsave_go(VipsImage *in, void **buf, size_t *len, int interlace, int quant
       bitdepth = 2;
   }
   else {
-    bitdepth = vips_get_bits_per_sample(in);
+    bitdepth = vips_get_palette_bit_depth(in);
     if (bitdepth && bitdepth <= 8) {
       if (bitdepth > 4)
         bitdepth = 8;
@@ -887,15 +888,10 @@ vips_webpsave_go(VipsImage *in, void **buf, size_t *len, int quality)
 int
 vips_gifsave_go(VipsImage *in, void **buf, size_t *len)
 {
-#if VIPS_SUPPORT_GIFSAVE
-  int bitdepth = vips_get_bits_per_sample(in);
+  int bitdepth = vips_get_palette_bit_depth(in);
   if (bitdepth <= 0 || bitdepth > 8)
     bitdepth = 8;
   return vips_gifsave_buffer(in, buf, len, "bitdepth", bitdepth, NULL);
-#else
-  vips_error("vips_gifsave_go", "Saving GIF is not supported (libvips 8.12+ reuired)");
-  return 1;
-#endif
 }
 
 int
@@ -905,17 +901,23 @@ vips_tiffsave_go(VipsImage *in, void **buf, size_t *len, int quality)
 }
 
 int
+vips_heifsave_go(VipsImage *in, void **buf, size_t *len, int quality)
+{
+  return vips_heifsave_buffer(
+      in, buf, len,
+      "Q", quality,
+      "compression", VIPS_FOREIGN_HEIF_COMPRESSION_HEVC,
+      NULL);
+}
+
+int
 vips_avifsave_go(VipsImage *in, void **buf, size_t *len, int quality, int speed)
 {
   return vips_heifsave_buffer(
       in, buf, len,
       "Q", quality,
       "compression", VIPS_FOREIGN_HEIF_COMPRESSION_AV1,
-#if VIPS_SUPPORT_AVIF_EFFORT
       "effort", 9 - speed,
-#elif VIPS_SUPPORT_AVIF_SPEED
-      "speed", speed,
-#endif
       NULL);
 }
 
