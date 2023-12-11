@@ -1,6 +1,11 @@
 # Changelog
 
 ## [Unreleased]
+### Change
+- Allow relative values for `gravity` and `watermark` offsets.
+- Revised downloading errors reporting.
+- Allow `IMGPROXY_TTL` to be zero.
+- Don't set `Expires` HTTP header as it is ignored if the `Cache-Control` header is set.
 
 ## [3.21.0] - 2023-11-23
 ### Add

@@ -17,6 +17,7 @@ import (
 	"github.com/imgproxy/imgproxy/v3/ierrors"
 	"github.com/imgproxy/imgproxy/v3/imagedata"
 	"github.com/imgproxy/imgproxy/v3/imagetype"
+	"github.com/imgproxy/imgproxy/v3/imath"
 	"github.com/imgproxy/imgproxy/v3/metrics"
 	"github.com/imgproxy/imgproxy/v3/metrics/stats"
 	"github.com/imgproxy/imgproxy/v3/options"
@@ -56,8 +57,6 @@ func initProcessingHandler() {
 }
 
 func setCacheControl(rw http.ResponseWriter, force *time.Time, originHeaders map[string]string) {
-	var cacheControl, expires string
-
 	ttl := -1
 
 	if _, ok := originHeaders["Fallback-Image"]; ok && config.FallbackImageTTL > 0 {
@@ -65,33 +64,30 @@ func setCacheControl(rw http.ResponseWriter, force *time.Time, originHeaders map
 	}
 
 	if force != nil && (ttl < 0 || force.Before(time.Now().Add(time.Duration(ttl)*time.Second))) {
-		rw.Header().Set("Cache-Control", fmt.Sprintf("max-age=%d, public", int(time.Until(*force).Seconds())))
-		rw.Header().Set("Expires", force.Format(http.TimeFormat))
-		return
+		ttl = imath.Min(config.TTL, imath.Max(0, int(time.Until(*force).Seconds())))
 	}
 
 	if config.CacheControlPassthrough && ttl < 0 && originHeaders != nil {
 		if val, ok := originHeaders["Cache-Control"]; ok && len(val) > 0 {
-			cacheControl = val
+			rw.Header().Set("Cache-Control", val)
+			return
 		}
+
 		if val, ok := originHeaders["Expires"]; ok && len(val) > 0 {
-			expires = val
+			if t, err := time.Parse(http.TimeFormat, val); err == nil {
+				ttl = imath.Max(0, int(time.Until(t).Seconds()))
+			}
 		}
 	}
 
-	if len(cacheControl) == 0 && len(expires) == 0 {
-		if ttl < 0 {
-			ttl = config.TTL
-		}
-		cacheControl = fmt.Sprintf("max-age=%d, public", ttl)
-		expires = time.Now().Add(time.Second * time.Duration(ttl)).Format(http.TimeFormat)
+	if ttl < 0 {
+		ttl = config.TTL
 	}
 
-	if len(cacheControl) > 0 {
-		rw.Header().Set("Cache-Control", cacheControl)
-	}
-	if len(expires) > 0 {
-		rw.Header().Set("Expires", expires)
+	if ttl > 0 {
+		rw.Header().Set("Cache-Control", fmt.Sprintf("max-age=%d, public", ttl))
+	} else {
+		rw.Header().Set("Cache-Control", "no-cache")
 	}
 }
 
@@ -328,23 +324,31 @@ func handleProcessing(reqID string, rw http.ResponseWriter, r *http.Request) {
 		respondWithNotModified(reqID, r, rw, po, imageURL, nmErr.Headers)
 		return
 	} else {
-		ierr, ierrok := err.(*ierrors.Error)
-		if ierrok {
-			statusCode = ierr.StatusCode
-		}
-		if config.ReportDownloadingErrors && (!ierrok || ierr.Unexpected) {
-			errorreport.Report(err, r)
-		}
+		// This may be a request timeout error or a request cancelled error.
+		// Check it before moving further
+		checkErr(ctx, "timeout", router.CheckTimeout(ctx))
 
-		sendErr(ctx, "download", err)
+		ierr := ierrors.Wrap(err, 0)
+		ierr.Unexpected = ierr.Unexpected || config.ReportDownloadingErrors
+
+		sendErr(ctx, "download", ierr)
 
 		if imagedata.FallbackImage == nil {
-			panic(err)
+			panic(ierr)
 		}
 
-		log.Warningf("Could not load image %s. Using fallback image. %s", imageURL, err.Error())
+		// We didn't panic, so the error is not reported.
+		// Report it now
+		if ierr.Unexpected {
+			errorreport.Report(ierr, r)
+		}
+
+		log.WithField("request_id", reqID).Warningf("Could not load image %s. Using fallback image. %s", imageURL, ierr.Error())
+
 		if config.FallbackImageHTTPCode > 0 {
 			statusCode = config.FallbackImageHTTPCode
+		} else {
+			statusCode = ierr.StatusCode
 		}
 
 		originData = imagedata.FallbackImage
